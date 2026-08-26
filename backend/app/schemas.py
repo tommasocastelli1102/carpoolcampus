@@ -22,6 +22,7 @@ class UserRegister(BaseModel):
     university: Optional[str] = None
     schedule_note: Optional[str] = None
     calendar_link: Optional[str] = None
+    profile_photo_url: Optional[str] = None
     # Driver-only, ignored for pure riders
     payment_methods: Optional[list[str]] = None
     payment_method_other: Optional[str] = None
@@ -55,6 +56,7 @@ class UserOut(BaseModel):
     university: Optional[str] = None
     schedule_note: Optional[str] = None
     calendar_link: Optional[str] = None
+    profile_photo_url: Optional[str] = None
     created_at: datetime
     driver_profile: Optional[DriverProfileOut] = None
 

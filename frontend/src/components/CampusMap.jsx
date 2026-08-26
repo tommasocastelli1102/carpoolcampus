@@ -9,16 +9,22 @@ const ROUTE_COLOR = "#2D6CF6"; // var(--primary), hardcoded: Leaflet can't read 
 const MATCH_COLOR = "#3FA66A"; // muted green, used only for map match/no-match status — the one
 const NO_MATCH_COLOR = "#5B6479"; // deliberate exception to the app's no-green rule (see CampusMap docs)
 
-function pinIcon({ emoji, ring, size = 30 }) {
+function pinIcon({ emoji, photoUrl, ring, size = 30 }) {
+  const content = photoUrl
+    ? `<img src="${photoUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover" onerror="this.style.display='none';this.nextSibling.style.display='flex';" /><div style="display:none;width:100%;height:100%;align-items:center;justify-content:center;font-size:${Math.round(
+        size * 0.52
+      )}px;">${emoji}</div>`
+    : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:${Math.round(
+        size * 0.52
+      )}px;">${emoji}</div>`;
   return L.divIcon({
     className: "",
     html: `<div style="
         width:${size}px;height:${size}px;border-radius:50%;
         background:#12172B;border:2.5px solid ${ring};
-        display:flex;align-items:center;justify-content:center;
-        font-size:${Math.round(size * 0.52)}px;
+        overflow:hidden;
         box-shadow:0 2px 8px rgba(0,0,0,0.5);
-      ">${emoji}</div>`,
+      ">${content}</div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   });
@@ -28,8 +34,15 @@ const HOME_ICON = pinIcon({ emoji: "🏠", ring: ROUTE_COLOR, size: 32 });
 const DEST_ICON = pinIcon({ emoji: "🎓", ring: "#F6B62D", size: 32 });
 const STOP_ICON = pinIcon({ emoji: "📍", ring: ROUTE_COLOR, size: 22 });
 
-function personIcon(matching, kind) {
-  return pinIcon({ emoji: kind === "driver" ? "🚗" : "🎒", ring: matching ? MATCH_COLOR : NO_MATCH_COLOR, size: 26 });
+// Falls back to the car/backpack icon whenever no profile photo was
+// uploaded (or the image URL fails to load), per spec.
+function personIcon(matching, kind, photoUrl) {
+  return pinIcon({
+    emoji: kind === "driver" ? "🚗" : "🎒",
+    photoUrl: photoUrl || null,
+    ring: matching ? MATCH_COLOR : NO_MATCH_COLOR,
+    size: 30,
+  });
 }
 
 /**
@@ -118,10 +131,11 @@ function FitBounds({ points }) {
 export default function CampusMap({
   homeAddress,
   destinationAddress,
-  others = [], // [{ id, address, matching, kind: 'driver'|'rider', name?, rating?, badge?: {kind:'pickup'|'meet_outside', meetOutsideDisplay?} }]
+  others = [], // [{ id, address, matching, kind: 'driver'|'rider', name?, rating?, photoUrl?, availabilityText?, badge?: {kind:'pickup'|'meet_outside', meetOutsideDisplay?} }]
   routeStops = [], // [address, ...] already-booked stops along the route (rider's view of a driver's route)
   variant = "compact", // "compact" | "expanded"
   onExpandRequest,
+  onPersonClick, // (person) => void — only fires once the map is interactive (expanded); compact mode's whole surface is a tap-to-expand target
   emptyHint,
 }) {
   const [coords, setCoords] = useState(new Map());
@@ -237,12 +251,25 @@ export default function CampusMap({
           ))}
 
           {othersWithCoords.map((o) => {
+            // Compact, always-visible label: name + rating + the +min/distance badge.
             const nameWithRating = [o.name, ratingText(o.rating)].filter(Boolean).join(" ");
             const text = [nameWithRating, badgeText(home, o.coord, o.badge)].filter(Boolean).join(" · ");
+            // Hover-only (native title attribute): when they're available, and
+            // that clicking sends a request — shown "on overlay" per spec,
+            // without permanently cluttering the map with every driver's hours.
+            const hoverParts = [o.availabilityText];
+            if (interactive && onPersonClick) hoverParts.push("Click to send a ride request");
+            const hoverTitle = hoverParts.filter(Boolean).join(" — ");
             return (
-              <Marker key={o.id} position={[o.coord.lat, o.coord.lng]} icon={personIcon(o.matching, o.kind)}>
+              <Marker
+                key={o.id}
+                position={[o.coord.lat, o.coord.lng]}
+                icon={personIcon(o.matching, o.kind, o.photoUrl)}
+                title={hoverTitle || undefined}
+                eventHandlers={onPersonClick ? { click: () => onPersonClick(o) } : undefined}
+              >
                 {text && (
-                  <Tooltip permanent direction="right" offset={[14, 0]} className="cc-map-tooltip">
+                  <Tooltip permanent direction="right" offset={[16, 0]} className="cc-map-tooltip">
                     {text}
                   </Tooltip>
                 )}
@@ -301,6 +328,7 @@ export default function CampusMap({
           color: var(--text-muted) !important;
         }
         .leaflet-control-attribution a { color: var(--text-muted) !important; }
+        .leaflet-marker-icon { cursor: pointer; }
       `}</style>
     </div>
   );

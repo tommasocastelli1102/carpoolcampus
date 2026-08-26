@@ -62,6 +62,9 @@ class User(Base):
     calendar_link: Mapped[str | None] = mapped_column(
         String(500), nullable=True, doc="Optional shareable calendar URL (e.g. Google Calendar)"
     )
+    profile_photo_url: Mapped[str | None] = mapped_column(
+        String(500), nullable=True, doc="Optional profile photo URL; falls back to a car/backpack icon in the UI"
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     driver_profile: Mapped["DriverProfile"] = relationship(

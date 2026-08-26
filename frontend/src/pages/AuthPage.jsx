@@ -28,6 +28,7 @@ const emptyForm = {
   phone_number: "",
   schedule_note: "",
   calendar_link: "",
+  profile_photo_url: "",
   payment_methods: [],
   payment_method_other: "",
   bio: "",
@@ -107,6 +108,7 @@ export default function AuthPage() {
         university: UNIVERSITIES.find((u) => u.value === form.university)?.label || null,
         schedule_note: form.schedule_note || null,
         calendar_link: form.calendar_link || null,
+        profile_photo_url: form.profile_photo_url || null,
       };
       if (role === "driver" || role === "both") {
         payload.payment_methods = form.payment_methods;
@@ -298,6 +300,17 @@ export default function AuthPage() {
                 placeholder="Paste a shareable Google Calendar (or similar) link"
               />
               <p className="helper-text">Lets the other side see your real availability at a glance.</p>
+            </div>
+
+            <div className="field">
+              <label>Profile photo URL (optional)</label>
+              <input
+                type="url"
+                value={form.profile_photo_url}
+                onChange={handleField("profile_photo_url")}
+                placeholder="Paste a link to your photo"
+              />
+              <p className="helper-text">Shown on the map and in ride listings instead of the car/backpack icon.</p>
             </div>
 
             {showDriverFields && (

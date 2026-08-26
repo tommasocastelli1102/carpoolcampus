@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import client, { apiErrorMessage } from "../api/client";
+import { geocodeAddress, geocodeMany } from "../api/geocode";
+import { haversineMiles, formatMiles } from "../lib/geo";
 import { useAuth } from "../context/AuthContext";
 import { StarDisplay } from "../components/StarRating";
 import CampusMap, { MapLegend } from "../components/CampusMap";
 import MapModal from "../components/MapModal";
 import { addressForUniversity } from "../lib/universities";
+import { CarIcon } from "../components/Icons";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const PAYMENT_LABELS = {
@@ -17,9 +20,75 @@ const PAYMENT_LABELS = {
   other: "Other",
 };
 
+const DISTANCE_OPTIONS = [
+  { value: "", label: "Any distance" },
+  { value: "1", label: "Within 1 mi" },
+  { value: "3", label: "Within 3 mi" },
+  { value: "5", label: "Within 5 mi" },
+  { value: "10", label: "Within 10 mi" },
+];
+const SEX_OPTIONS = ["Any sex", "Female", "Male", "Non-binary"];
+const SEATS_OPTIONS = [
+  { value: "", label: "Any seats" },
+  { value: "1", label: "1+ seat" },
+  { value: "2", label: "2+ seats" },
+  { value: "3", label: "3+ seats" },
+];
+const TIME_OPTIONS = [
+  { value: "", label: "Any time" },
+  { value: "morning", label: "Morning (before 12pm)" },
+  { value: "afternoon", label: "Afternoon (12–5pm)" },
+  { value: "evening", label: "Evening (after 5pm)" },
+];
+const SORT_OPTIONS = [
+  { value: "distance", label: "Distance from me" },
+  { value: "rating", label: "Driver rating" },
+  { value: "seats", label: "Seats available" },
+  { value: "newest", label: "Newest listed" },
+];
+
+function timeBucket(startTime) {
+  const hour = Number((startTime || "").slice(0, 2));
+  if (hour < 12) return "morning";
+  if (hour < 17) return "afternoon";
+  return "evening";
+}
+
 function slotLabel(slot) {
   const when = slot.date ? slot.date : slot.day_of_week != null ? `Every ${DAYS[slot.day_of_week]}` : "One-off";
   return `${when} · ${slot.start_time.slice(0, 5)}–${slot.end_time.slice(0, 5)}`;
+}
+
+/** Small round avatar: the driver/rider's uploaded photo, or the car icon as a fallback. */
+function PersonAvatar({ photoUrl, size = 40 }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        overflow: "hidden",
+        flexShrink: 0,
+        background: "var(--bg)",
+        border: "1px solid var(--border)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {photoUrl && !failed ? (
+        <img
+          src={photoUrl}
+          alt=""
+          onError={() => setFailed(true)}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      ) : (
+        <CarIcon size={Math.round(size * 0.6)} />
+      )}
+    </div>
+  );
 }
 
 export default function RiderDashboard() {
@@ -33,6 +102,17 @@ export default function RiderDashboard() {
   const [drivers, setDrivers] = useState([]);
   const [bookedStops, setBookedStops] = useState([]); // addresses of other riders already confirmed on "my" driver's route
   const [mapExpanded, setMapExpanded] = useState(false);
+  const [riderCoord, setRiderCoord] = useState(null);
+  const [driverCoords, setDriverCoords] = useState(new Map());
+
+  // Filters — applied client-side over the fetched slots.
+  const [maxDistance, setMaxDistance] = useState("");
+  const [dayFilter, setDayFilter] = useState("");
+  const [timeFilter, setTimeFilter] = useState("");
+  const [sexFilter, setSexFilter] = useState("");
+  const [minSeats, setMinSeats] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState("");
+  const [sortBy, setSortBy] = useState("distance");
 
   const loadSlots = async () => {
     setLoading(true);
@@ -69,6 +149,18 @@ export default function RiderDashboard() {
     loadSlots();
   };
 
+  // Geocode "my apartment" once, and every distinct driver address in the
+  // current slot list, so we can show/sort by distance.
+  useEffect(() => {
+    if (!user.address) return;
+    geocodeAddress(user.address).then(setRiderCoord);
+  }, [user.address]);
+
+  useEffect(() => {
+    const addresses = slots.map((s) => s.driver?.address).filter(Boolean);
+    geocodeMany(addresses).then(setDriverCoords);
+  }, [slots]);
+
   // Which driver (if any) does this rider currently have an active
   // relationship with? Used both for the "+min / distance" badge and to
   // draw that driver's already-booked stops on the route line.
@@ -97,34 +189,73 @@ export default function RiderDashboard() {
     return openByDriver;
   }, [slots]);
 
+  // The map only ever shows drivers who currently have an open seat — per
+  // spec, unavailable drivers don't get a car icon on the map at all.
   const driverPins = useMemo(
     () =>
       drivers
-        .filter((d) => d.address)
+        .filter((d) => d.address && driverHasOpenSeat.has(d.id))
         .map((d) => {
           const myRequestToThisDriver = myRides.find((r) => r.driver_id === d.id);
+          const driverSlots = slots.filter((s) => s.driver_id === d.id);
           return {
             id: d.id,
             address: d.address,
             kind: "driver",
             name: `${d.first_name} ${d.last_name}`,
             rating: d.driver_profile?.avg_rating,
-            matching: driverHasOpenSeat.has(d.id),
+            photoUrl: d.profile_photo_url,
+            matching: true,
+            availabilityText: driverSlots.length ? `Free ${driverSlots.map(slotLabel).join(", ")}` : null,
             badge: myRequestToThisDriver
               ? { kind: myRequestToThisDriver.pickup_type, meetOutsideDisplay: "distance" }
               : null,
           };
         }),
-    [drivers, myRides, driverHasOpenSeat]
+    [drivers, myRides, driverHasOpenSeat, slots]
   );
+
+  // Clicking a driver's icon on the (expanded, interactive) map opens the
+  // same View & Request flow as clicking a row in the list below.
+  const handlePersonClick = (person) => {
+    const slot = slots.find((s) => s.driver_id === person.id && s.seats_available > 0) || slots.find((s) => s.driver_id === person.id);
+    if (slot) {
+      setSelected(slot);
+      setMapExpanded(false);
+    }
+  };
 
   const mapProps = {
     homeAddress: user.address,
     destinationAddress: addressForUniversity(user.university),
     others: driverPins,
     routeStops: bookedStops,
+    onPersonClick: handlePersonClick,
     emptyHint: "Add your home address (see your profile) to see the map.",
   };
+
+  const visibleSlots = useMemo(() => {
+    let list = slots.map((s) => {
+      const coord = s.driver?.address ? driverCoords.get(s.driver.address) : null;
+      const distance = riderCoord && coord ? haversineMiles(riderCoord, coord) : null;
+      return { ...s, _distance: distance };
+    });
+
+    if (dayFilter !== "") list = list.filter((s) => String(s.day_of_week) === dayFilter);
+    if (timeFilter) list = list.filter((s) => timeBucket(s.start_time) === timeFilter);
+    if (sexFilter) list = list.filter((s) => s.driver?.sex === sexFilter);
+    if (minSeats) list = list.filter((s) => s.seats_available >= Number(minSeats));
+    if (paymentFilter) list = list.filter((s) => s.driver?.driver_profile?.payment_methods?.includes(paymentFilter));
+    if (maxDistance) list = list.filter((s) => s._distance != null && s._distance <= Number(maxDistance));
+
+    list.sort((a, b) => {
+      if (sortBy === "distance") return (a._distance ?? Infinity) - (b._distance ?? Infinity);
+      if (sortBy === "rating") return (b.driver?.driver_profile?.avg_rating ?? 0) - (a.driver?.driver_profile?.avg_rating ?? 0);
+      if (sortBy === "seats") return b.seats_available - a.seats_available;
+      return b.id - a.id; // newest listed
+    });
+    return list;
+  }, [slots, driverCoords, riderCoord, dayFilter, timeFilter, sexFilter, minSeats, paymentFilter, maxDistance, sortBy]);
 
   return (
     <div className="container" style={{ paddingTop: 36 }}>
@@ -137,7 +268,7 @@ export default function RiderDashboard() {
       <CampusMap {...mapProps} variant="compact" onExpandRequest={() => setMapExpanded(true)} />
       <MapLegend />
 
-      <form onSubmit={handleSearch} className="row" style={{ marginTop: 28, marginBottom: 28, gap: 10 }}>
+      <form onSubmit={handleSearch} className="row" style={{ marginTop: 28, marginBottom: 16, gap: 10 }}>
         <input
           placeholder="From…"
           value={filterFrom}
@@ -153,24 +284,75 @@ export default function RiderDashboard() {
         <button className="btn btn-primary" style={{ flexShrink: 0 }}>Search</button>
       </form>
 
+      <div className="card-flat" style={{ marginBottom: 24 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+            gap: 10,
+          }}
+        >
+          <FilterSelect label="Distance" value={maxDistance} onChange={setMaxDistance} options={DISTANCE_OPTIONS} />
+          <FilterSelect
+            label="Day"
+            value={dayFilter}
+            onChange={setDayFilter}
+            options={[{ value: "", label: "Any day" }, ...DAYS.map((d, i) => ({ value: String(i), label: d }))]}
+          />
+          <FilterSelect label="Time" value={timeFilter} onChange={setTimeFilter} options={TIME_OPTIONS} />
+          <FilterSelect
+            label="Sex"
+            value={sexFilter}
+            onChange={setSexFilter}
+            options={SEX_OPTIONS.map((s) => (s === "Any sex" ? { value: "", label: s } : { value: s, label: s }))}
+          />
+          <FilterSelect label="Seats" value={minSeats} onChange={setMinSeats} options={SEATS_OPTIONS} />
+          <FilterSelect
+            label="Payment"
+            value={paymentFilter}
+            onChange={setPaymentFilter}
+            options={[{ value: "", label: "Any payment" }, ...Object.entries(PAYMENT_LABELS).map(([value, label]) => ({ value, label }))]}
+          />
+          <FilterSelect label="Sort by" value={sortBy} onChange={setSortBy} options={SORT_OPTIONS} />
+        </div>
+      </div>
+
       {loading ? (
         <div className="spinner" />
-      ) : slots.length === 0 ? (
-        <p className="muted">No driver routes match yet — try clearing your filters.</p>
+      ) : visibleSlots.length === 0 ? (
+        <p className="muted">No driver routes match yet — try clearing some filters.</p>
       ) : (
         <div className="stack">
-          {slots.map((slot) => (
+          {visibleSlots.map((slot) => (
             <div key={slot.id} className="card-flat row-between">
-              <div>
-                <div style={{ fontWeight: 700, marginBottom: 4 }}>
-                  {slot.route_from} → {slot.route_to}
-                </div>
-                <div className="muted" style={{ fontSize: 13, marginBottom: 6 }}>{slotLabel(slot)}</div>
-                <div className="row" style={{ gap: 8 }}>
-                  <StarDisplay value={slot.driver?.driver_profile?.avg_rating} />
-                  <span className="muted" style={{ fontSize: 13 }}>
-                    {slot.driver?.first_name} {slot.driver?.last_name} · {slot.seats_available} seat(s) left
-                  </span>
+              <div className="row" style={{ gap: 12, alignItems: "flex-start" }}>
+                <PersonAvatar photoUrl={slot.driver?.profile_photo_url} />
+                <div>
+                  <div className="row" style={{ gap: 8 }}>
+                    <span
+                      title={slot.seats_available > 0 ? "Available at this time" : "No open seats"}
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        background: slot.seats_available > 0 ? "#3FA66A" : "#5B6479",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <div style={{ fontWeight: 700 }}>
+                      {slot.route_from} → {slot.route_to}
+                    </div>
+                  </div>
+                  <div className="muted" style={{ fontSize: 13, marginTop: 4, marginBottom: 6 }}>
+                    {slotLabel(slot)}
+                    {slot._distance != null ? ` · ${formatMiles(slot._distance)} from you` : ""}
+                  </div>
+                  <div className="row" style={{ gap: 8 }}>
+                    <StarDisplay value={slot.driver?.driver_profile?.avg_rating} />
+                    <span className="muted" style={{ fontSize: 13 }}>
+                      {slot.driver?.first_name} {slot.driver?.last_name} · {slot.seats_available} seat(s) left
+                    </span>
+                  </div>
                 </div>
               </div>
               <button className="btn btn-primary btn-sm" onClick={() => setSelected(slot)}>
@@ -204,6 +386,21 @@ export default function RiderDashboard() {
       )}
 
       {mapExpanded && <MapModal {...mapProps} onClose={() => setMapExpanded(false)} />}
+    </div>
+  );
+}
+
+function FilterSelect({ label, value, onChange, options }) {
+  return (
+    <div>
+      <label style={{ fontSize: 11, marginBottom: 4 }}>{label}</label>
+      <select value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -296,7 +493,10 @@ function RouteDetailModal({ slot, onClose, onRequested }) {
           </div>
         ) : (
           <>
-            <h3 style={{ marginBottom: 2 }}>{driver.first_name} {driver.last_name}</h3>
+            <div className="row" style={{ gap: 12, marginBottom: 2 }}>
+              <PersonAvatar photoUrl={driver.profile_photo_url} size={48} />
+              <h3>{driver.first_name} {driver.last_name}</h3>
+            </div>
             <div className="row" style={{ gap: 8, marginBottom: 10 }}>
               <StarDisplay value={profile?.avg_rating} />
               <span className="muted" style={{ fontSize: 13 }}>{profile?.avg_rating ?? "No"} rating</span>
