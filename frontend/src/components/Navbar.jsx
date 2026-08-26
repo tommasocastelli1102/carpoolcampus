@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import NotificationBell from "./NotificationBell";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -48,6 +49,7 @@ export default function Navbar() {
               <span className="muted navbar-greeting" style={{ fontSize: 14, whiteSpace: "nowrap" }}>
                 Hi, {user.first_name}
               </span>
+              <NotificationBell />
               <button className="btn btn-ghost btn-sm" onClick={handleLogout} style={{ flexShrink: 0 }}>
                 Log out
               </button>

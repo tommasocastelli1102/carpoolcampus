@@ -1,3 +1,17 @@
+export function BellIcon({ size = 20, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <path
+        d="M6 10a6 6 0 1 1 12 0c0 3.4 1 5.2 1.8 6.2.4.5.1 1.3-.6 1.3H4.8c-.7 0-1-.8-.6-1.3C5 15.2 6 13.4 6 10z"
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path d="M9.5 20a2.5 2.5 0 0 0 5 0" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function SteeringWheelIcon({ size = 40, color = "var(--primary-hover)" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
