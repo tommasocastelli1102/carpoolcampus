@@ -53,8 +53,14 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     phone_number: Mapped[str | None] = mapped_column(String(30), nullable=True)
     address: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    university: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, doc="e.g. 'UCLA Anderson School of Management' or 'UCLA'"
+    )
     schedule_note: Mapped[str | None] = mapped_column(
         Text, nullable=True, doc="Free text: when free to drive / when rides are typically needed"
+    )
+    calendar_link: Mapped[str | None] = mapped_column(
+        String(500), nullable=True, doc="Optional shareable calendar URL (e.g. Google Calendar)"
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

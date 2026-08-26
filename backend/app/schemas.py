@@ -19,7 +19,9 @@ class UserRegister(BaseModel):
     password: str = Field(min_length=6)
     phone_number: Optional[str] = None
     address: Optional[str] = None
+    university: Optional[str] = None
     schedule_note: Optional[str] = None
+    calendar_link: Optional[str] = None
     # Driver-only, ignored for pure riders
     payment_methods: Optional[list[str]] = None
     payment_method_other: Optional[str] = None
@@ -50,7 +52,9 @@ class UserOut(BaseModel):
     email: EmailStr
     phone_number: Optional[str] = None
     address: Optional[str] = None
+    university: Optional[str] = None
     schedule_note: Optional[str] = None
+    calendar_link: Optional[str] = None
     created_at: datetime
     driver_profile: Optional[DriverProfileOut] = None
 

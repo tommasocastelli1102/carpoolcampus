@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { apiErrorMessage } from "../api/client";
+import client, { apiErrorMessage } from "../api/client";
 import ComingSoonModal from "../components/ComingSoonModal";
+import { EyeIcon, EyeOffIcon, PlusIcon, XIcon } from "../components/Icons";
 
 const PAYMENT_OPTIONS = [
   { value: "venmo", label: "Venmo" },
@@ -12,16 +13,31 @@ const PAYMENT_OPTIONS = [
   { value: "coffee", label: "Coffee" },
 ];
 
+const UNIVERSITIES = [
+  { value: "", label: "Select a university…", address: "" },
+  {
+    value: "ucla_anderson",
+    label: "UCLA Anderson School of Management",
+    address: "110 Westwood Plaza, Los Angeles, CA 90095",
+  },
+  { value: "ucla", label: "UCLA (University of California, Los Angeles)", address: "405 Hilgard Ave, Los Angeles, CA 90095" },
+  { value: "other", label: "Other / not listed", address: "" },
+];
+
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
 const emptyForm = {
   first_name: "",
   last_name: "",
   birthday: "",
   sex: "",
   address: "",
+  university: "",
   email: "",
   password: "",
   phone_number: "",
   schedule_note: "",
+  calendar_link: "",
   payment_methods: [],
   payment_method_other: "",
   bio: "",
@@ -38,6 +54,7 @@ export default function AuthPage() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showBruinModal, setShowBruinModal] = useState(false);
+  const [spots, setSpots] = useState([]); // driver "when free to drive" spots: {day_of_week, start_time, end_time}
 
   const { login, register } = useAuth();
   const navigate = useNavigate();
@@ -47,6 +64,16 @@ export default function AuthPage() {
   };
 
   const handleField = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const handleUniversityChange = (e) => {
+    const value = e.target.value;
+    const preset = UNIVERSITIES.find((u) => u.value === value);
+    setForm((f) => ({
+      ...f,
+      university: value,
+      address: preset?.address ? preset.address : f.address,
+    }));
+  };
 
   const togglePaymentMethod = (value) => {
     setForm((f) => {
@@ -87,7 +114,9 @@ export default function AuthPage() {
         password: form.password,
         phone_number: form.phone_number || null,
         address: form.address || null,
+        university: UNIVERSITIES.find((u) => u.value === form.university)?.label || null,
         schedule_note: form.schedule_note || null,
+        calendar_link: form.calendar_link || null,
       };
       if (role === "driver" || role === "both") {
         payload.payment_methods = form.payment_methods;
@@ -95,6 +124,30 @@ export default function AuthPage() {
         payload.bio = form.bio || null;
       }
       const user = await register(payload);
+
+      // Turn any "+ spots" the driver added into real availability slots now
+      // that we have an account (and token) to attach them to.
+      if ((role === "driver" || role === "both") && spots.length > 0) {
+        const universityPreset = UNIVERSITIES.find((u) => u.value === form.university);
+        const routeFrom = form.address?.trim() || "Home";
+        const routeTo = universityPreset?.address || universityPreset?.label || "Campus";
+        await Promise.all(
+          spots.map((spot) =>
+            client.post("/availability", {
+              day_of_week: spot.day_of_week,
+              start_time: spot.start_time,
+              end_time: spot.end_time,
+              route_from: routeFrom,
+              route_to: routeTo,
+              seats_available: 3,
+            })
+          )
+        ).catch(() => {
+          // Non-fatal: the account is already created; slots can be added
+          // later from the driver dashboard if this fails.
+        });
+      }
+
       goToDashboard(user);
     } catch (err) {
       setError(apiErrorMessage(err, "Couldn't create your account."));
@@ -103,9 +156,13 @@ export default function AuthPage() {
     }
   };
 
+  const showRoleSelector = mode === "register";
+  const showDriverFields = mode === "register" && (role === "driver" || role === "both");
+
   return (
     <div className="container" style={{ maxWidth: 620, padding: "56px 24px" }}>
       <div className="card">
+        {/* --- Fixed header: this part never changes shape when switching Log In / Register --- */}
         <div className="row" style={{ marginBottom: 24, gap: 8 }}>
           <TabButton active={mode === "login"} onClick={() => setMode("login")}>
             Log In
@@ -115,19 +172,30 @@ export default function AuthPage() {
           </TabButton>
         </div>
 
-        {mode === "register" && (
-          <div className="row" style={{ marginBottom: 26, gap: 8 }}>
-            <RoleButton active={role === "rider"} onClick={() => setRole("rider")}>
-              🎒 I'm a Rider
-            </RoleButton>
-            <RoleButton active={role === "driver"} onClick={() => setRole("driver")}>
-              🚗 I'm a Driver
-            </RoleButton>
-            <RoleButton active={role === "both"} onClick={() => setRole("both")}>
-              Both
-            </RoleButton>
-          </div>
-        )}
+        <div
+          className="row"
+          style={{
+            gap: 8,
+            marginBottom: showRoleSelector ? 26 : 0,
+            maxHeight: showRoleSelector ? 60 : 0,
+            opacity: showRoleSelector ? 1 : 0,
+            overflow: "hidden",
+            pointerEvents: showRoleSelector ? "auto" : "none",
+            transition: "max-height 0.18s ease, opacity 0.15s ease, margin-bottom 0.18s ease",
+          }}
+          aria-hidden={!showRoleSelector}
+        >
+          <RoleButton active={role === "rider"} onClick={() => setRole("rider")}>
+            🎒 I'm a Rider
+          </RoleButton>
+          <RoleButton active={role === "driver"} onClick={() => setRole("driver")}>
+            🚗 I'm a Driver
+          </RoleButton>
+          <RoleButton active={role === "both"} onClick={() => setRole("both")}>
+            Both
+          </RoleButton>
+        </div>
+        {/* --- End fixed header --- */}
 
         {error && <p className="error-text" style={{ marginBottom: 16 }}>{error}</p>}
 
@@ -143,16 +211,12 @@ export default function AuthPage() {
                 placeholder="you@ucla.edu"
               />
             </div>
-            <div className="field">
-              <label>Password</label>
-              <input
-                type="password"
-                required
-                value={loginForm.password}
-                onChange={(e) => setLoginForm((f) => ({ ...f, password: e.target.value }))}
-                placeholder="••••••••"
-              />
-            </div>
+            <PasswordField
+              label="Password"
+              value={loginForm.password}
+              onChange={(e) => setLoginForm((f) => ({ ...f, password: e.target.value }))}
+              placeholder="••••••••"
+            />
             <button className="btn btn-primary btn-block" disabled={submitting}>
               {submitting ? "Logging in…" : "Log In"}
             </button>
@@ -190,8 +254,24 @@ export default function AuthPage() {
             </div>
 
             <div className="field">
+              <label>University</label>
+              <select value={form.university} onChange={handleUniversityChange}>
+                {UNIVERSITIES.map((u) => (
+                  <option key={u.value} value={u.value}>
+                    {u.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="field">
               <label>Address</label>
-              <input value={form.address} onChange={handleField("address")} placeholder="Neighborhood or street address" />
+              <input
+                value={form.address}
+                onChange={handleField("address")}
+                placeholder="Neighborhood or street address"
+              />
+              <p className="helper-text">Pre-filled from your university choice above — edit it to your own address.</p>
             </div>
 
             <div className="field-row">
@@ -205,17 +285,13 @@ export default function AuthPage() {
               </div>
             </div>
 
-            <div className="field">
-              <label>Password</label>
-              <input
-                type="password"
-                required
-                minLength={6}
-                value={form.password}
-                onChange={handleField("password")}
-                placeholder="At least 6 characters"
-              />
-            </div>
+            <PasswordField
+              label="Password"
+              value={form.password}
+              onChange={handleField("password")}
+              placeholder="At least 6 characters"
+              minLength={6}
+            />
 
             <div className="field">
               <label>{role === "driver" ? "When are you usually free to drive?" : "When do you typically need rides?"}</label>
@@ -226,8 +302,21 @@ export default function AuthPage() {
               />
             </div>
 
-            {(role === "driver" || role === "both") && (
+            <div className="field">
+              <label>Calendar link (optional)</label>
+              <input
+                type="url"
+                value={form.calendar_link}
+                onChange={handleField("calendar_link")}
+                placeholder="Paste a shareable Google Calendar (or similar) link"
+              />
+              <p className="helper-text">Lets the other side see your real availability at a glance.</p>
+            </div>
+
+            {showDriverFields && (
               <>
+                <SpotPicker spots={spots} setSpots={setSpots} />
+
                 <div className="field">
                   <label>Preferred payment methods</label>
                   <div className="checkbox-grid">
@@ -316,5 +405,148 @@ function RoleButton({ active, onClick, children }) {
     >
       {children}
     </button>
+  );
+}
+
+function PasswordField({ label, value, onChange, placeholder, minLength, required = true }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="field">
+      <label>{label}</label>
+      <div style={{ position: "relative" }}>
+        <input
+          type={visible ? "text" : "password"}
+          required={required}
+          minLength={minLength}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          style={{ paddingRight: 44 }}
+        />
+        <button
+          type="button"
+          onClick={() => setVisible((v) => !v)}
+          aria-label={visible ? "Hide password" : "Show password"}
+          style={{
+            position: "absolute",
+            right: 6,
+            top: "50%",
+            transform: "translateY(-50%)",
+            background: "transparent",
+            border: "none",
+            padding: 8,
+            cursor: "pointer",
+            color: "var(--text-muted)",
+            display: "flex",
+          }}
+        >
+          {visible ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SpotPicker({ spots, setSpots }) {
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState({ day_of_week: "0", start_time: "08:00", end_time: "09:00" });
+
+  const addSpot = () => {
+    setSpots((s) => [...s, { ...draft, day_of_week: Number(draft.day_of_week) }]);
+    setAdding(false);
+    setDraft({ day_of_week: "0", start_time: "08:00", end_time: "09:00" });
+  };
+
+  const removeSpot = (index) => {
+    setSpots((s) => s.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="field">
+      <label>Regular driving spots</label>
+
+      {spots.length > 0 && (
+        <div className="row" style={{ gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+          {spots.map((spot, i) => (
+            <span
+              key={i}
+              className="row"
+              style={{
+                gap: 6,
+                background: "var(--bg)",
+                border: "1px solid var(--border)",
+                borderRadius: 999,
+                padding: "6px 6px 6px 12px",
+                fontSize: 13,
+              }}
+            >
+              {DAYS[spot.day_of_week]} · {spot.start_time}–{spot.end_time}
+              <button
+                type="button"
+                onClick={() => removeSpot(i)}
+                aria-label="Remove spot"
+                style={{
+                  background: "var(--surface-raised)",
+                  border: "none",
+                  borderRadius: "50%",
+                  width: 20,
+                  height: 20,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  color: "var(--text-muted)",
+                }}
+              >
+                <XIcon size={11} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {adding ? (
+        <div className="card-flat">
+          <div className="field-row" style={{ marginBottom: 10 }}>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Day</label>
+              <select value={draft.day_of_week} onChange={(e) => setDraft((d) => ({ ...d, day_of_week: e.target.value }))}>
+                {DAYS.map((d, i) => (
+                  <option key={d} value={i}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }} />
+          </div>
+          <div className="field-row" style={{ marginBottom: 12 }}>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Start time</label>
+              <input type="time" value={draft.start_time} onChange={(e) => setDraft((d) => ({ ...d, start_time: e.target.value }))} />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>End time</label>
+              <input type="time" value={draft.end_time} onChange={(e) => setDraft((d) => ({ ...d, end_time: e.target.value }))} />
+            </div>
+          </div>
+          <div className="row" style={{ gap: 8 }}>
+            <button type="button" className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => setAdding(false)}>
+              Cancel
+            </button>
+            <button type="button" className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={addSpot}>
+              Add spot
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAdding(true)}>
+          <PlusIcon size={14} /> Add a spot
+        </button>
+      )}
+      <p className="helper-text">
+        Pick a day of the week and a time you're usually free to drive — you can add as many as you like, and add more later from your dashboard.
+      </p>
+    </div>
   );
 }

@@ -22,7 +22,7 @@ export default function Navbar() {
       }}
     >
       <div className="container row-between" style={{ height: 68 }}>
-        <Link to="/" style={{ textDecoration: "none" }}>
+        <Link to="/home" style={{ textDecoration: "none" }}>
           <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em" }}>
             Carpool<span style={{ color: "var(--primary-hover)" }}>Campus</span>
           </span>

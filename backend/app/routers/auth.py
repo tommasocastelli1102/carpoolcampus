@@ -25,7 +25,9 @@ def register(payload: schemas.UserRegister, db: Session = Depends(get_db)):
         password_hash=hash_password(payload.password),
         phone_number=payload.phone_number,
         address=payload.address,
+        university=payload.university,
         schedule_note=payload.schedule_note,
+        calendar_link=payload.calendar_link,
     )
     db.add(user)
     db.flush()  # get user.id before creating the driver profile
