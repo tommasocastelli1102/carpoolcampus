@@ -21,30 +21,33 @@ export default function Navbar() {
         backdropFilter: "blur(10px)",
       }}
     >
-      <div className="container row-between" style={{ height: 68 }}>
-        <Link to="/home" style={{ textDecoration: "none" }}>
-          <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em" }}>
+      <div
+        className="container row-between navbar-row"
+        style={{ minHeight: 68, padding: "12px 24px", flexWrap: "nowrap", overflowX: "auto" }}
+      >
+        <Link to="/home" style={{ textDecoration: "none", flexShrink: 0 }}>
+          <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", whiteSpace: "nowrap" }}>
             Carpool<span style={{ color: "var(--primary-hover)" }}>Campus</span>
           </span>
         </Link>
 
-        <nav className="row" style={{ gap: 20 }}>
+        <nav className="row" style={{ gap: 20, flexShrink: 0, flexWrap: "nowrap" }}>
           {user ? (
             <>
               {(user.role === "driver" || user.role === "both") && (
-                <Link to="/driver" className="muted" style={{ textDecoration: "none", fontSize: 14 }}>
-                  Driver
+                <Link to="/driver" className="muted" style={{ textDecoration: "none", fontSize: 14, whiteSpace: "nowrap" }}>
+                  🚗 Driver
                 </Link>
               )}
               {(user.role === "rider" || user.role === "both") && (
-                <Link to="/rider" className="muted" style={{ textDecoration: "none", fontSize: 14 }}>
-                  Rider
+                <Link to="/rider" className="muted" style={{ textDecoration: "none", fontSize: 14, whiteSpace: "nowrap" }}>
+                  🎒 Rider
                 </Link>
               )}
-              <span className="muted" style={{ fontSize: 14 }}>
+              <span className="muted navbar-greeting" style={{ fontSize: 14, whiteSpace: "nowrap" }}>
                 Hi, {user.first_name}
               </span>
-              <button className="btn btn-ghost btn-sm" onClick={handleLogout}>
+              <button className="btn btn-ghost btn-sm" onClick={handleLogout} style={{ flexShrink: 0 }}>
                 Log out
               </button>
             </>

@@ -175,7 +175,12 @@ export default function ChatPage() {
       </div>
 
       <form onSubmit={handleSend} className="row" style={{ gap: 10 }}>
-        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Type a message…" />
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Type a message…"
+          style={{ flex: "1 1 auto", minWidth: 0 }}
+        />
         <button className="btn btn-primary" style={{ flexShrink: 0 }}>Send</button>
       </form>
     </div>

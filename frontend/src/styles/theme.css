@@ -33,6 +33,7 @@ body {
   color: var(--text);
   font-family: var(--font);
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden; /* safety net: nothing should ever force horizontal scroll on the page */
 }
 
 a {
@@ -328,4 +329,62 @@ textarea:focus {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 760px) {
+  .container {
+    padding: 0 16px;
+  }
+
+  h1 {
+    font-size: clamp(22px, 6vw, 28px) !important;
+  }
+
+  /* Two-column form rows (name/last name, birthday/sex, start/end time...)
+     become one column so fields never get cramped or clipped. */
+  .field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .checkbox-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Generic row/row-between utilities used throughout the dashboards
+     (ride cards, request rows, action button clusters) wrap/stack instead
+     of overflowing. The navbar opts out — it manages its own compact
+     single-row mobile layout below. */
+  .row:not(.navbar-row) {
+    flex-wrap: wrap;
+  }
+
+  .row-between:not(.navbar-row) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .row-between:not(.navbar-row) > * {
+    width: 100%;
+  }
+
+  .card,
+  .modal {
+    padding: 20px;
+  }
+
+  .btn {
+    padding: 12px 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar-row {
+    gap: 8px !important;
+  }
+
+  .navbar-greeting {
+    display: none;
+  }
 }

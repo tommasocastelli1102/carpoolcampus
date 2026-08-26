@@ -137,8 +137,18 @@ export default function RiderDashboard() {
       <MapLegend />
 
       <form onSubmit={handleSearch} className="row" style={{ marginTop: 28, marginBottom: 28, gap: 10 }}>
-        <input placeholder="From…" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} />
-        <input placeholder="To…" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} />
+        <input
+          placeholder="From…"
+          value={filterFrom}
+          onChange={(e) => setFilterFrom(e.target.value)}
+          style={{ flex: "1 1 140px", minWidth: 0 }}
+        />
+        <input
+          placeholder="To…"
+          value={filterTo}
+          onChange={(e) => setFilterTo(e.target.value)}
+          style={{ flex: "1 1 140px", minWidth: 0 }}
+        />
         <button className="btn btn-primary" style={{ flexShrink: 0 }}>Search</button>
       </form>
 

@@ -21,9 +21,19 @@ export default function MapModal({ onClose, ...mapProps }) {
           overflow: "hidden",
         }}
       >
-        <div className="row-between" style={{ padding: "14px 18px", borderBottom: "1px solid var(--border)" }}>
-          <span style={{ fontWeight: 700, fontSize: 15 }}>Map</span>
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>
+        <div
+          className="row-between"
+          style={{
+            padding: "14px 18px",
+            borderBottom: "1px solid var(--border)",
+            // Explicit overrides: a title+close bar should stay one row even
+            // on mobile, unlike the generic .row-between stacking behavior.
+            flexDirection: "row",
+            alignItems: "center",
+          }}
+        >
+          <span style={{ fontWeight: 700, fontSize: 15, width: "auto" }}>Map</span>
+          <button className="btn btn-ghost btn-sm" onClick={onClose} style={{ width: "auto", flexShrink: 0 }}>
             Close ✕
           </button>
         </div>
