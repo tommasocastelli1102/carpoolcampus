@@ -59,6 +59,24 @@ function slotLabel(slot) {
   return `${when} · ${slot.start_time.slice(0, 5)}–${slot.end_time.slice(0, 5)}`;
 }
 
+const REVIEW_CATEGORIES = [
+  { key: "stars_driving_style", label: "Driving style" },
+  { key: "stars_speed", label: "Speed" },
+  { key: "stars_cleanliness", label: "Cleanliness" },
+  { key: "stars_punctuality", label: "Punctuality" },
+];
+
+/** Per-category averages across every review left for this driver, so
+ * "click on a driver" shows the full breakdown, not just the overall
+ * avg_rating. Categories nobody has rated yet are omitted. */
+function categoryAverages(reviews) {
+  return REVIEW_CATEGORIES.map(({ key, label }) => {
+    const values = reviews.map((r) => r[key]).filter((v) => v != null);
+    if (values.length === 0) return null;
+    return { key, label, avg: values.reduce((a, b) => a + b, 0) / values.length, count: values.length };
+  }).filter(Boolean);
+}
+
 /** Small round avatar: the driver/rider's uploaded photo, or the car icon as a fallback. */
 function PersonAvatar({ photoUrl, size = 40 }) {
   const [failed, setFailed] = useState(false);
@@ -448,6 +466,7 @@ function RouteDetailModal({ slot, onClose, onRequested }) {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const categoryBreakdown = useMemo(() => categoryAverages(reviews), [reviews]);
 
   useEffect(() => {
     if (driver) {
@@ -501,6 +520,21 @@ function RouteDetailModal({ slot, onClose, onRequested }) {
               <StarDisplay value={profile?.avg_rating} />
               <span className="muted" style={{ fontSize: 13 }}>{profile?.avg_rating ?? "No"} rating</span>
             </div>
+
+            {categoryBreakdown.length > 0 && (
+              <div className="card-flat stack" style={{ gap: 6, marginBottom: 14 }}>
+                {categoryBreakdown.map((c) => (
+                  <div key={c.key} className="row-between">
+                    <span className="muted" style={{ fontSize: 13 }}>{c.label}</span>
+                    <div className="row" style={{ gap: 6 }}>
+                      <StarDisplay value={c.avg} size={13} />
+                      <span className="muted" style={{ fontSize: 12 }}>{c.avg.toFixed(1)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {profile?.bio && <p className="muted" style={{ fontSize: 14, marginBottom: 14 }}>{profile.bio}</p>}
 
             <div className="card-flat" style={{ marginBottom: 16 }}>
