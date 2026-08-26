@@ -210,9 +210,6 @@ export default function AuthPage() {
             <button className="btn btn-primary btn-block" disabled={submitting}>
               {submitting ? "Logging in…" : "Log In"}
             </button>
-            <p className="helper-text" style={{ textAlign: "center", marginTop: 10 }}>
-              Demo accounts: any seeded user, e.g. maya.driver@ucla.edu / password123
-            </p>
           </form>
         ) : (
           <form onSubmit={handleRegister}>
