@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { CarIcon, DenyIcon, SteeringWheelIcon } from "../components/Icons";
 
 export default function Home() {
   return (
@@ -40,36 +41,60 @@ export default function Home() {
           }}
           className="home-cards"
         >
-          <div className="card">
-            <div style={{ fontSize: 34, marginBottom: 10 }}>🎒</div>
-            <h2 style={{ fontSize: 24, marginBottom: 6 }}>I don't have a car</h2>
-            <p className="muted" style={{ marginBottom: 18 }}>
-              International or no-car students commuting 2–5 miles to campus, stuck choosing between
-              slow, unreliable public transit and rideshare apps that add up fast.
+          <div className="card" style={{ display: "flex", flexDirection: "column" }}>
+            <div className="row" style={{ gap: 10, marginBottom: 14 }}>
+              <span style={{ position: "relative", width: 40, height: 40, flexShrink: 0 }}>
+                <DenyIcon size={40} />
+                <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <CarIcon size={22} />
+                </span>
+              </span>
+              <h2 style={{ fontSize: 24 }}>I don't have a car</h2>
+            </div>
+            <p className="muted" style={{ marginBottom: 18, fontSize: 16 }}>
+              International or no-car students stuck choosing between slow, unreliable public transit
+              and rideshare apps that add up fast.
             </p>
-            <ul style={{ margin: "0 0 22px", paddingLeft: 18, color: "var(--text-muted)", fontSize: 14, lineHeight: 1.9 }}>
-              <li>Public transit: slow, infrequent, unreliable in bad weather</li>
-              <li>Uber/Lyft: ~$20 one-way, ~$40 round trip — every single day</li>
-              <li>No easy way to meet fellow students already driving your route</li>
+            <ul style={{ margin: "0 0 22px", paddingLeft: 18, color: "var(--text-muted)", fontSize: 16, lineHeight: 2 }}>
+              <li>
+                <strong style={{ color: "var(--text)" }}>Commuting distance:</strong> 2–5 miles to campus, every day
+              </li>
+              <li>
+                <strong style={{ color: "var(--text)" }}>Public transit:</strong> slow, infrequent, unreliable in bad weather
+              </li>
+              <li>
+                <strong style={{ color: "var(--text)" }}>Rideshare cost:</strong> ~$20 one-way, ~$40 round trip — every single day
+              </li>
+              <li>
+                <strong style={{ color: "var(--text)" }}>Finding a ride:</strong> no easy way to meet fellow students already driving your route
+              </li>
             </ul>
-            <Link to="/auth?role=rider">
-              <button className="btn btn-primary btn-block">Log In / Register as a Rider</button>
-            </Link>
+            <div style={{ marginTop: "auto" }}>
+              <Link to="/auth?role=rider">
+                <button className="btn btn-primary btn-block">Log In / Register as a Rider</button>
+              </Link>
+            </div>
           </div>
 
-          <div className="card">
-            <div style={{ fontSize: 34, marginBottom: 10 }}>🚗</div>
-            <h2 style={{ fontSize: 24, marginBottom: 6 }}>I have a car</h2>
-            <p className="muted" style={{ marginBottom: 18 }}>
+          <div className="card" style={{ display: "flex", flexDirection: "column" }}>
+            <div className="row" style={{ gap: 10, marginBottom: 14 }}>
+              <SteeringWheelIcon size={40} />
+              <h2 style={{ fontSize: 24 }}>I have a car</h2>
+            </div>
+            <p className="muted" style={{ marginBottom: 18, fontSize: 16 }}>
               Student drivers already making the commute — usually with 3–4 empty seats — while
               covering the full cost of ownership alone.
             </p>
-            <ul style={{ margin: "0 0 22px", paddingLeft: 18, color: "var(--text-muted)", fontSize: 14, lineHeight: 1.9 }}>
-              <li>Gas: ~$150–200/month for a typical commuter</li>
-              <li>Insurance: ~$250/month</li>
+            <ul style={{ margin: "0 0 22px", paddingLeft: 18, color: "var(--text-muted)", fontSize: 16, lineHeight: 2 }}>
               <li>
-                UCLA campus commuter parking permit: ~$340.23/quarter (~$113/month) — general UCLA
-                Transportation student rate; Anderson doesn't publish a separate figure and routes
+                <strong style={{ color: "var(--text)" }}>Gas:</strong> ~$150–200/month for a typical commuter
+              </li>
+              <li>
+                <strong style={{ color: "var(--text)" }}>Insurance:</strong> ~$250/month
+              </li>
+              <li>
+                <strong style={{ color: "var(--text)" }}>Parking permit:</strong> ~$340.23/quarter (~$113/month) — general
+                UCLA Transportation student rate; Anderson doesn't publish a separate figure and routes
                 students to this same rate.{" "}
                 <a
                   href="https://transportation.ucla.edu/campus-parking/ucla-parking-rates-and-fees"
@@ -81,11 +106,15 @@ export default function Home() {
                 </a>{" "}
                 <span style={{ fontSize: 11, opacity: 0.7 }}>(TODO: confirm against latest fiscal-year rate sheet)</span>
               </li>
-              <li>Tickets &amp; fines add up on top of all of it</li>
+              <li>
+                <strong style={{ color: "var(--text)" }}>Tickets &amp; fines:</strong> add up on top of all of it
+              </li>
             </ul>
-            <Link to="/auth?role=driver">
-              <button className="btn btn-primary btn-block">Log In / Register as a Driver</button>
-            </Link>
+            <div style={{ marginTop: "auto" }}>
+              <Link to="/auth?role=driver">
+                <button className="btn btn-primary btn-block">Log In / Register as a Driver</button>
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -124,9 +153,14 @@ export default function Home() {
             <h3 style={{ marginBottom: 4 }}>Drivers</h3>
             <p className="muted" style={{ marginBottom: 18 }}>Turn empty seats into savings</p>
             <div style={{ fontSize: 34, fontWeight: 800, marginBottom: 6 }}>Free to join</div>
-            <p className="muted" style={{ fontSize: 14 }}>
-              Earn $4+ per ride, or accept an alternative like free beer, coffee, or aux cord privileges.
+            <p className="muted" style={{ fontSize: 14, marginBottom: 16 }}>
+              Earn $4+ per ride, or accept an alternative payment instead:
             </p>
+            <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+              <PaymentPill icon="🍺" label="Beer" />
+              <PaymentPill icon="☕" label="Coffee" />
+              <PaymentPill icon="🎧" label="Aux cord / DJ rights" />
+            </div>
           </div>
         </div>
       </section>
@@ -137,5 +171,25 @@ export default function Home() {
         }
       `}</style>
     </div>
+  );
+}
+
+function PaymentPill({ icon, label }) {
+  return (
+    <span
+      className="row"
+      style={{
+        gap: 8,
+        background: "var(--surface-raised)",
+        border: "1px solid var(--border)",
+        borderRadius: 999,
+        padding: "8px 14px",
+        fontSize: 13,
+        color: "var(--text)",
+      }}
+    >
+      <span style={{ fontSize: 17 }}>{icon}</span>
+      {label}
+    </span>
   );
 }
