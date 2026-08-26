@@ -200,10 +200,14 @@ export default function CampusMap({
           touchZoom={interactive}
           attributionControl={interactive}
         >
+          {/* Esri's free dark-canvas tiles — no API key needed (unlike CARTO's
+              basemaps.cartocdn.com, which now requires one). Base layer +
+              a separate transparent reference layer for labels. */}
           <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+            attribution="Esri, HERE, Garmin, &copy; OpenStreetMap contributors, and the GIS community"
           />
+          <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}" />
           <FitBounds points={allPoints} />
 
           {routeLine && <Polyline positions={routeLine.map((p) => [p.lat, p.lng])} pathOptions={{ color: ROUTE_COLOR, weight: 4, opacity: 0.85 }} />}
