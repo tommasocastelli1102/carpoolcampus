@@ -302,12 +302,14 @@ export default function RiderDashboard() {
         <button className="btn btn-primary" style={{ flexShrink: 0 }}>Search</button>
       </form>
 
-      <div className="card-flat" style={{ marginBottom: 24 }}>
+      <div className="card-flat" style={{ marginBottom: 24, overflowX: "auto" }}>
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+            display: "flex",
+            flexWrap: "nowrap",
             gap: 10,
+            width: "max-content",
+            minWidth: "100%",
           }}
         >
           <FilterSelect label="Distance" value={maxDistance} onChange={setMaxDistance} options={DISTANCE_OPTIONS} />
@@ -410,9 +412,9 @@ export default function RiderDashboard() {
 
 function FilterSelect({ label, value, onChange, options }) {
   return (
-    <div>
+    <div style={{ flexShrink: 0, width: 168 }}>
       <label style={{ fontSize: 11, marginBottom: 4 }}>{label}</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)}>
+      <select value={value} onChange={(e) => onChange(e.target.value)} style={{ width: "100%" }}>
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}
