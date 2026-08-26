@@ -519,9 +519,9 @@ function RouteDetailModal({ slot, onClose, onRequested }) {
               <span className="muted" style={{ fontSize: 13 }}>{profile?.avg_rating ?? "No"} rating</span>
             </div>
 
-            {categoryBreakdown.length > 0 && (
-              <div className="card-flat stack" style={{ gap: 6, marginBottom: 14 }}>
-                {categoryBreakdown.map((c) => (
+            <div className="card-flat stack" style={{ gap: 6, marginBottom: 14 }}>
+              {categoryBreakdown.length > 0 ? (
+                categoryBreakdown.map((c) => (
                   <div key={c.key} className="row-between">
                     <span className="muted" style={{ fontSize: 13 }}>{c.label}</span>
                     <div className="row" style={{ gap: 6 }}>
@@ -529,9 +529,11 @@ function RouteDetailModal({ slot, onClose, onRequested }) {
                       <span className="muted" style={{ fontSize: 12 }}>{c.avg.toFixed(1)}</span>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
+                ))
+              ) : (
+                <span className="muted" style={{ fontSize: 13 }}>No ratings yet — be the first to review {driver.first_name} after your ride.</span>
+              )}
+            </div>
 
             {profile?.bio && <p className="muted" style={{ fontSize: 14, marginBottom: 14 }}>{profile.bio}</p>}
 
@@ -545,18 +547,20 @@ function RouteDetailModal({ slot, onClose, onRequested }) {
               </div>
             </div>
 
-            {reviews.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div className="muted" style={{ fontSize: 12, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  Recent reviews
-                </div>
-                {reviews.slice(0, 2).map((r) => (
+            <div style={{ marginBottom: 16 }}>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Recent reviews
+              </div>
+              {reviews.length > 0 ? (
+                reviews.slice(0, 2).map((r) => (
                   <div key={r.id} className="muted" style={{ fontSize: 13, marginBottom: 4 }}>
                     "{r.free_text_feedback || "Great ride."}" — {r.reviewer?.first_name}
                   </div>
-                ))}
-              </div>
-            )}
+                ))
+              ) : (
+                <span className="muted" style={{ fontSize: 13 }}>No written reviews yet.</span>
+              )}
+            </div>
 
             <form onSubmit={handleSubmit}>
               {error && <p className="error-text">{error}</p>}
