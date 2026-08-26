@@ -143,11 +143,11 @@ export default function Home() {
             <p className="muted" style={{ fontSize: 14, marginBottom: 16 }}>
               Earn $4+ per ride, or accept an alternative payment instead:
             </p>
-            <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
-              <PaymentPill icon="💵" label="Cash ($4+)" />
+            <div className="row" style={{ gap: 8, flexWrap: "nowrap", overflowX: "auto", paddingBottom: 4 }}>
+              <PaymentPill icon="💵" label="Cash" />
               <PaymentPill icon="🍺" label="Beer" />
               <PaymentPill icon="☕" label="Coffee" />
-              <PaymentPill icon="🎧" label="Aux cord / DJ rights" />
+              <PaymentPill icon="🎧" label="Aux cord" />
             </div>
           </div>
         </div>
@@ -167,16 +167,18 @@ function PaymentPill({ icon, label }) {
     <span
       className="row"
       style={{
-        gap: 8,
+        gap: 6,
         background: "var(--surface-raised)",
         border: "1px solid var(--border)",
         borderRadius: 999,
-        padding: "8px 14px",
-        fontSize: 13,
+        padding: "7px 12px",
+        fontSize: 12.5,
         color: "var(--text)",
+        flexShrink: 0,
+        whiteSpace: "nowrap",
       }}
     >
-      <span style={{ fontSize: 17 }}>{icon}</span>
+      <span style={{ fontSize: 16 }}>{icon}</span>
       {label}
     </span>
   );
