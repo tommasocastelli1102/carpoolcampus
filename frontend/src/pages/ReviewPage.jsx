@@ -24,7 +24,7 @@ export default function ReviewPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  const [stars, setStars] = useState({ driving_style: 0, speed: 0, cleanliness: 0, punctuality: 0 });
+  const [stars, setStars] = useState({ drive_safety: 0, clean_car: 0, punctuality: 0, good_company: 0 });
   const [feedback, setFeedback] = useState("");
   const [audioFile, setAudioFile] = useState(null);
   const [paid, setPaid] = useState("yes");
@@ -53,10 +53,10 @@ export default function ReviewPage() {
       await client.post("/reviews", {
         ride_request_id: Number(rideRequestId),
         reviewee_id: otherParty.id,
-        stars_driving_style: stars.driving_style || null,
-        stars_speed: stars.speed || null,
-        stars_cleanliness: stars.cleanliness || null,
+        stars_drive_safety: stars.drive_safety || null,
+        stars_clean_car: stars.clean_car || null,
         stars_punctuality: stars.punctuality || null,
+        stars_good_company: stars.good_company || null,
         free_text_feedback: feedback || null,
         // MVP stub: we don't actually upload/transcribe audio, just note a file was attached.
         audio_url: audioFile ? `local-upload:${audioFile.name}` : null,
@@ -122,10 +122,10 @@ export default function ReviewPage() {
       <form onSubmit={handleSubmit} className="card">
         {error && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
 
-        <StarInput label="Driving style" value={stars.driving_style} onChange={(n) => setStars((s) => ({ ...s, driving_style: n }))} />
-        <StarInput label="Speed" value={stars.speed} onChange={(n) => setStars((s) => ({ ...s, speed: n }))} />
-        <StarInput label="Car cleanliness" value={stars.cleanliness} onChange={(n) => setStars((s) => ({ ...s, cleanliness: n }))} />
+        <StarInput label="Drive safety" value={stars.drive_safety} onChange={(n) => setStars((s) => ({ ...s, drive_safety: n }))} />
+        <StarInput label="Clean car" value={stars.clean_car} onChange={(n) => setStars((s) => ({ ...s, clean_car: n }))} />
         <StarInput label="Punctuality" value={stars.punctuality} onChange={(n) => setStars((s) => ({ ...s, punctuality: n }))} />
+        <StarInput label="Good company" value={stars.good_company} onChange={(n) => setStars((s) => ({ ...s, good_company: n }))} />
 
         <div className="field">
           <label>Other feedback</label>

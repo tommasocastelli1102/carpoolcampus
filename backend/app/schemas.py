@@ -152,10 +152,10 @@ class MessageOut(BaseModel):
 class ReviewCreate(BaseModel):
     ride_request_id: int
     reviewee_id: int
-    stars_driving_style: Optional[int] = Field(default=None, ge=1, le=5)
-    stars_speed: Optional[int] = Field(default=None, ge=1, le=5)
-    stars_cleanliness: Optional[int] = Field(default=None, ge=1, le=5)
+    stars_drive_safety: Optional[int] = Field(default=None, ge=1, le=5)
+    stars_clean_car: Optional[int] = Field(default=None, ge=1, le=5)
     stars_punctuality: Optional[int] = Field(default=None, ge=1, le=5)
+    stars_good_company: Optional[int] = Field(default=None, ge=1, le=5)
     free_text_feedback: Optional[str] = None
     audio_url: Optional[str] = None
     paid: bool = False
@@ -182,10 +182,10 @@ class ReviewOut(BaseModel):
     ride_request_id: int
     reviewer_id: int
     reviewee_id: int
-    stars_driving_style: Optional[int] = None
-    stars_speed: Optional[int] = None
-    stars_cleanliness: Optional[int] = None
+    stars_drive_safety: Optional[int] = None
+    stars_clean_car: Optional[int] = None
     stars_punctuality: Optional[int] = None
+    stars_good_company: Optional[int] = None
     free_text_feedback: Optional[str] = None
     audio_url: Optional[str] = None
     paid: bool

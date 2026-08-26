@@ -123,7 +123,7 @@ export default function DriverDashboard() {
                     ? `${r.availability.start_time.slice(0, 5)}–${r.availability.end_time.slice(0, 5)}`
                     : "Time TBD"}
                   {" · "}
-                  {r.pickup_type === "pickup" ? "Pickup" : "Meet outside"}
+                  {r.pickup_type === "pickup" ? "Pickup" : "Meet outside their place"}
                   {r.custom_place ? ` at ${r.custom_place}` : r.availability ? ` near ${r.availability.route_from}` : ""}
                 </div>
               </div>

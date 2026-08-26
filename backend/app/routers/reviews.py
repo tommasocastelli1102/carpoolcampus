@@ -40,7 +40,7 @@ def create_review(
         scores = [
             s
             for r in all_reviews
-            for s in (r.stars_driving_style, r.stars_speed, r.stars_cleanliness, r.stars_punctuality)
+            for s in (r.stars_drive_safety, r.stars_clean_car, r.stars_punctuality, r.stars_good_company)
             if s is not None
         ]
         if scores:

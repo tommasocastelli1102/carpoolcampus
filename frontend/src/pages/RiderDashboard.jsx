@@ -21,24 +21,24 @@ const PAYMENT_LABELS = {
 };
 
 const DISTANCE_OPTIONS = [
-  { value: "", label: "Any distance" },
-  { value: "1", label: "Within 1 mi" },
-  { value: "3", label: "Within 3 mi" },
-  { value: "5", label: "Within 5 mi" },
-  { value: "10", label: "Within 10 mi" },
+  { value: "", label: "Distance" },
+  { value: "1", label: "1 mi" },
+  { value: "3", label: "3 mi" },
+  { value: "5", label: "5 mi" },
+  { value: "10", label: "10 mi" },
 ];
-const SEX_OPTIONS = ["Any sex", "Female", "Male", "Non-binary"];
+const SEX_OPTIONS = ["Sex", "Female", "Male", "Non-binary"];
 const SEATS_OPTIONS = [
-  { value: "", label: "Any seats" },
+  { value: "", label: "Seats" },
   { value: "1", label: "1+ seat" },
   { value: "2", label: "2+ seats" },
   { value: "3", label: "3+ seats" },
 ];
 const TIME_OPTIONS = [
-  { value: "", label: "Any time" },
-  { value: "morning", label: "Morning (before 12pm)" },
-  { value: "afternoon", label: "Afternoon (12–5pm)" },
-  { value: "evening", label: "Evening (after 5pm)" },
+  { value: "", label: "Time" },
+  { value: "morning", label: "Morning" },
+  { value: "afternoon", label: "Afternoon" },
+  { value: "evening", label: "Evening" },
 ];
 const SORT_OPTIONS = [
   { value: "distance", label: "Distance from me" },
@@ -60,10 +60,10 @@ function slotLabel(slot) {
 }
 
 const REVIEW_CATEGORIES = [
-  { key: "stars_driving_style", label: "Driving style" },
-  { key: "stars_speed", label: "Speed" },
-  { key: "stars_cleanliness", label: "Cleanliness" },
+  { key: "stars_drive_safety", label: "Drive safety" },
+  { key: "stars_clean_car", label: "Clean car" },
   { key: "stars_punctuality", label: "Punctuality" },
+  { key: "stars_good_company", label: "Good company" },
 ];
 
 /** Per-category averages across every review left for this driver, so
@@ -302,36 +302,28 @@ export default function RiderDashboard() {
         <button className="btn btn-primary" style={{ flexShrink: 0 }}>Search</button>
       </form>
 
-      <div className="card-flat" style={{ marginBottom: 24, overflowX: "auto" }}>
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "nowrap",
-            gap: 10,
-            width: "max-content",
-            minWidth: "100%",
-          }}
-        >
+      <div className="card-flat" style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", flexWrap: "nowrap", gap: 6 }}>
           <FilterSelect label="Distance" value={maxDistance} onChange={setMaxDistance} options={DISTANCE_OPTIONS} />
           <FilterSelect
             label="Day"
             value={dayFilter}
             onChange={setDayFilter}
-            options={[{ value: "", label: "Any day" }, ...DAYS.map((d, i) => ({ value: String(i), label: d }))]}
+            options={[{ value: "", label: "Day" }, ...DAYS.map((d, i) => ({ value: String(i), label: d }))]}
           />
           <FilterSelect label="Time" value={timeFilter} onChange={setTimeFilter} options={TIME_OPTIONS} />
           <FilterSelect
             label="Sex"
             value={sexFilter}
             onChange={setSexFilter}
-            options={SEX_OPTIONS.map((s) => (s === "Any sex" ? { value: "", label: s } : { value: s, label: s }))}
+            options={SEX_OPTIONS.map((s) => (s === "Sex" ? { value: "", label: s } : { value: s, label: s }))}
           />
           <FilterSelect label="Seats" value={minSeats} onChange={setMinSeats} options={SEATS_OPTIONS} />
           <FilterSelect
             label="Payment"
             value={paymentFilter}
             onChange={setPaymentFilter}
-            options={[{ value: "", label: "Any payment" }, ...Object.entries(PAYMENT_LABELS).map(([value, label]) => ({ value, label }))]}
+            options={[{ value: "", label: "Payment" }, ...Object.entries(PAYMENT_LABELS).map(([value, label]) => ({ value, label }))]}
           />
           <FilterSelect label="Sort by" value={sortBy} onChange={setSortBy} options={SORT_OPTIONS} />
         </div>
@@ -412,9 +404,13 @@ export default function RiderDashboard() {
 
 function FilterSelect({ label, value, onChange, options }) {
   return (
-    <div style={{ flexShrink: 0, width: 168 }}>
-      <label style={{ fontSize: 11, marginBottom: 4 }}>{label}</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)} style={{ width: "100%" }}>
+    <div style={{ flex: "1 1 0", minWidth: 0 }}>
+      <label style={{ fontSize: 10, marginBottom: 3 }}>{label}</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ width: "100%", fontSize: 12, padding: "9px 8px" }}
+      >
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}
@@ -435,7 +431,7 @@ function MyRideRow({ ride }) {
           {ride.availability ? ` · ${ride.availability.route_from} → ${ride.availability.route_to}` : ""}
         </div>
         <div className="muted" style={{ fontSize: 13 }}>
-          {ride.pickup_type === "pickup" ? "Pickup" : "Meet outside"}
+          {ride.pickup_type === "pickup" ? "Pickup" : "Meet outside your place"}
           {ride.custom_place ? ` · ${ride.custom_place}` : ""}
         </div>
       </div>
@@ -571,7 +567,7 @@ function RouteDetailModal({ slot, onClose, onRequested }) {
                     Pickup at my door
                   </RadioPill>
                   <RadioPill active={pickupType === "meet_outside"} onClick={() => setPickupType("meet_outside")}>
-                    Meet outside
+                    Meet outside your place
                   </RadioPill>
                 </div>
               </div>
