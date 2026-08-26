@@ -160,6 +160,20 @@ class ReviewCreate(BaseModel):
     paid_method: Optional[str] = None
 
 
+# ---------- Map ----------
+
+class DriverStopOut(BaseModel):
+    """One other confirmed rider's pickup point on a driver's route.
+
+    Deliberately minimal (no name) — used to draw "already booked" stops
+    on the map without exposing who's riding.
+    """
+
+    ride_request_id: int
+    address: Optional[str] = None
+    pickup_type: PickupType
+
+
 class ReviewOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int

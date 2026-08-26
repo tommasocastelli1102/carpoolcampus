@@ -56,7 +56,10 @@ export default function DriverDashboard() {
   return (
     <div className="container" style={{ paddingTop: 36 }}>
       <div className="row-between" style={{ marginBottom: 4 }}>
-        <h1 style={{ fontSize: 30 }}>Driver dashboard</h1>
+        <div className="row" style={{ gap: 12 }}>
+          <span style={{ fontSize: 30 }} aria-hidden>🚗</span>
+          <h1 style={{ fontSize: 30 }}>Driver dashboard</h1>
+        </div>
         <button className="btn btn-primary btn-sm" onClick={() => setShowAddSlot(true)}>
           + Add availability
         </button>

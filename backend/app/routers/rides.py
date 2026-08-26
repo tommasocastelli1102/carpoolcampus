@@ -99,6 +99,37 @@ def my_rides(
     return query.order_by(models.RideRequest.created_at.desc()).all()
 
 
+@router.get("/driver/{driver_id}/stops", response_model=list[schemas.DriverStopOut])
+def driver_booked_stops(
+    driver_id: int,
+    exclude_ride_request_id: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Other riders already confirmed on this driver's route — for drawing
+    the driver's route with its existing stops on a rider's map. No rider
+    identity is exposed, just where they're being picked up."""
+    query = (
+        db.query(models.RideRequest)
+        .options(joinedload(models.RideRequest.rider))
+        .filter(
+            models.RideRequest.driver_id == driver_id,
+            models.RideRequest.status.in_([models.RideStatus.confirmed, models.RideStatus.completed]),
+        )
+    )
+    if exclude_ride_request_id is not None:
+        query = query.filter(models.RideRequest.id != exclude_ride_request_id)
+
+    return [
+        schemas.DriverStopOut(
+            ride_request_id=r.id,
+            address=r.custom_place or (r.rider.address if r.rider else None),
+            pickup_type=r.pickup_type,
+        )
+        for r in query.all()
+    ]
+
+
 def _reload(db: Session, ride_request_id: int) -> models.RideRequest:
     return (
         db.query(models.RideRequest)

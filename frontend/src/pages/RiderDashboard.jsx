@@ -59,7 +59,10 @@ export default function RiderDashboard() {
 
   return (
     <div className="container" style={{ paddingTop: 36 }}>
-      <h1 style={{ fontSize: 30, marginBottom: 4 }}>Find a ride</h1>
+      <div className="row" style={{ gap: 12, marginBottom: 4 }}>
+        <span style={{ fontSize: 30 }} aria-hidden>🎒</span>
+        <h1 style={{ fontSize: 30 }}>Rider dashboard</h1>
+      </div>
       <p className="muted" style={{ marginBottom: 26 }}>Browse driver routes and time slots headed your way.</p>
 
       <form onSubmit={handleSearch} className="row" style={{ marginBottom: 28, gap: 10 }}>
