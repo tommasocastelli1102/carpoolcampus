@@ -108,6 +108,7 @@ export default function RiderDashboard() {
             address: d.address,
             kind: "driver",
             name: `${d.first_name} ${d.last_name}`,
+            rating: d.driver_profile?.avg_rating,
             matching: driverHasOpenSeat.has(d.id),
             badge: myRequestToThisDriver
               ? { kind: myRequestToThisDriver.pickup_type, meetOutsideDisplay: "distance" }

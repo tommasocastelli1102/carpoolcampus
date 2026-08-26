@@ -56,6 +56,11 @@ function badgeText(home, personCoord, badge) {
   return null;
 }
 
+function ratingText(rating) {
+  const n = Number(rating);
+  return n > 0 ? `★${n.toFixed(1)}` : null;
+}
+
 export function MapLegend() {
   const items = [
     { swatch: "#12172B", ring: ROUTE_COLOR, label: "Home / route" },
@@ -113,7 +118,7 @@ function FitBounds({ points }) {
 export default function CampusMap({
   homeAddress,
   destinationAddress,
-  others = [], // [{ id, address, matching, kind: 'driver'|'rider', name?, badge?: {kind:'pickup'|'meet_outside', meetOutsideDisplay?} }]
+  others = [], // [{ id, address, matching, kind: 'driver'|'rider', name?, rating?, badge?: {kind:'pickup'|'meet_outside', meetOutsideDisplay?} }]
   routeStops = [], // [address, ...] already-booked stops along the route (rider's view of a driver's route)
   variant = "compact", // "compact" | "expanded"
   onExpandRequest,
@@ -219,7 +224,8 @@ export default function CampusMap({
           ))}
 
           {othersWithCoords.map((o) => {
-            const text = [o.name, badgeText(home, o.coord, o.badge)].filter(Boolean).join(" · ");
+            const nameWithRating = [o.name, ratingText(o.rating)].filter(Boolean).join(" ");
+            const text = [nameWithRating, badgeText(home, o.coord, o.badge)].filter(Boolean).join(" · ");
             return (
               <Marker key={o.id} position={[o.coord.lat, o.coord.lng]} icon={personIcon(o.matching, o.kind)}>
                 {text && (
