@@ -93,18 +93,7 @@ export default function Home() {
                 <strong style={{ color: "var(--text)" }}>Insurance:</strong> ~$250/month
               </li>
               <li>
-                <strong style={{ color: "var(--text)" }}>Parking permit:</strong> ~$340.23/quarter (~$113/month) — general
-                UCLA Transportation student rate; Anderson doesn't publish a separate figure and routes
-                students to this same rate.{" "}
-                <a
-                  href="https://transportation.ucla.edu/campus-parking/ucla-parking-rates-and-fees"
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ color: "var(--primary-hover)" }}
-                >
-                  Source
-                </a>{" "}
-                <span style={{ fontSize: 11, opacity: 0.7 }}>(TODO: confirm against latest fiscal-year rate sheet)</span>
+                <strong style={{ color: "var(--text)" }}>Parking permit:</strong> ~$340.23/quarter (~$113/month)
               </li>
               <li>
                 <strong style={{ color: "var(--text)" }}>Tickets &amp; fines:</strong> add up on top of all of it
@@ -130,9 +119,7 @@ export default function Home() {
         >
           <h3 style={{ fontSize: 22, marginBottom: 10 }}>One empty seat is another student's cheaper, easier commute.</h3>
           <p className="muted" style={{ maxWidth: 640, marginInline: "auto" }}>
-            CarpoolCampus turns the ride you're already taking into shared savings — riders pay a
-            fraction of rideshare prices, drivers offset real ownership costs, and every filled
-            seat means one fewer car on the road to campus.
+            Lower costs for riders, real savings for drivers, fewer cars on the road.
           </p>
         </div>
       </section>
@@ -157,6 +144,7 @@ export default function Home() {
               Earn $4+ per ride, or accept an alternative payment instead:
             </p>
             <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+              <PaymentPill icon="💵" label="Cash ($4+)" />
               <PaymentPill icon="🍺" label="Beer" />
               <PaymentPill icon="☕" label="Coffee" />
               <PaymentPill icon="🎧" label="Aux cord / DJ rights" />
