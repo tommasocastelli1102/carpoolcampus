@@ -42,18 +42,18 @@ python -m venv .venv
 source .venv/bin/activate
 
 pip install -r requirements.txt
-
-copy .env.example .env   # Windows; use `cp` on macOS/Linux
 ```
 
-Edit `backend/.env` and set `DATABASE_URL` to match the database you created,
-e.g.:
+Create `backend/.env` (gitignored — never commit real credentials) with your
+DB connection string and a JWT secret:
 
 ```
 DATABASE_URL=postgresql+psycopg2://postgres:YOUR_PASSWORD@localhost:5432/carpoolcampus
+JWT_SECRET=some-random-string-for-local-dev
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=10080
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
-
-Also set `JWT_SECRET` to any random string for local dev.
 
 Run the API (tables are created automatically on startup from the SQLAlchemy
 models):
@@ -124,7 +124,7 @@ backend/
   alembic/                     Migrations (see Schema note above)
   seed.py                        Demo data seed script
   requirements.txt
-  .env.example
+  .env                            Local config (gitignored — create it yourself, see setup above)
 
 frontend/
   src/
