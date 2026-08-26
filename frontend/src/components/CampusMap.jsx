@@ -161,7 +161,20 @@ export default function CampusMap({
   const height = variant === "expanded" ? "100%" : "clamp(220px, 38vh, 340px)";
 
   return (
-    <div style={{ position: "relative", height, borderRadius: variant === "expanded" ? 0 : "var(--radius-lg)", overflow: "hidden" }}>
+    <div
+      style={{
+        position: "relative",
+        height,
+        borderRadius: variant === "expanded" ? 0 : "var(--radius-lg)",
+        overflow: "hidden",
+        // Leaflet's internal panes use hard-coded z-index values up to 700
+        // (popups/tooltips). Without isolating them into their own stacking
+        // context, they can end up compositing above unrelated page chrome
+        // (e.g. the sticky navbar) regardless of the navbar's own z-index.
+        isolation: "isolate",
+        zIndex: 0,
+      }}
+    >
       {loading && allPoints.length === 0 ? (
         <div
           style={{
