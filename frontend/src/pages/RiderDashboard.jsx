@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import client, { apiErrorMessage } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { StarDisplay } from "../components/StarRating";
+import CampusMap, { MapLegend } from "../components/CampusMap";
+import MapModal from "../components/MapModal";
+import { addressForUniversity } from "../lib/universities";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const PAYMENT_LABELS = {
@@ -27,6 +30,9 @@ export default function RiderDashboard() {
   const [myRides, setMyRides] = useState([]);
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
+  const [drivers, setDrivers] = useState([]);
+  const [bookedStops, setBookedStops] = useState([]); // addresses of other riders already confirmed on "my" driver's route
+  const [mapExpanded, setMapExpanded] = useState(false);
 
   const loadSlots = async () => {
     setLoading(true);
@@ -46,9 +52,15 @@ export default function RiderDashboard() {
     setMyRides(data.filter((r) => r.rider_id === user.id));
   };
 
+  const loadDrivers = async () => {
+    const { data } = await client.get("/users", { params: { role: "driver" } });
+    setDrivers(data);
+  };
+
   useEffect(() => {
     loadSlots();
     loadMyRides();
+    loadDrivers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -57,15 +69,74 @@ export default function RiderDashboard() {
     loadSlots();
   };
 
+  // Which driver (if any) does this rider currently have an active
+  // relationship with? Used both for the "+min / distance" badge and to
+  // draw that driver's already-booked stops on the route line.
+  const activeRide = useMemo(
+    () => myRides.find((r) => r.status === "confirmed" || r.status === "pending"),
+    [myRides]
+  );
+
+  useEffect(() => {
+    if (!activeRide) {
+      setBookedStops([]);
+      return;
+    }
+    client
+      .get(`/rides/driver/${activeRide.driver_id}/stops`, { params: { exclude_ride_request_id: activeRide.id } })
+      .then(({ data }) => setBookedStops(data.map((s) => s.address).filter(Boolean)))
+      .catch(() => setBookedStops([]));
+  }, [activeRide]);
+
+  // A driver "matches" if they currently have an open seat on any slot.
+  const driverHasOpenSeat = useMemo(() => {
+    const openByDriver = new Set();
+    slots.forEach((s) => {
+      if (s.seats_available > 0) openByDriver.add(s.driver_id);
+    });
+    return openByDriver;
+  }, [slots]);
+
+  const driverPins = useMemo(
+    () =>
+      drivers
+        .filter((d) => d.address)
+        .map((d) => {
+          const myRequestToThisDriver = myRides.find((r) => r.driver_id === d.id);
+          return {
+            id: d.id,
+            address: d.address,
+            kind: "driver",
+            name: `${d.first_name} ${d.last_name}`,
+            matching: driverHasOpenSeat.has(d.id),
+            badge: myRequestToThisDriver
+              ? { kind: myRequestToThisDriver.pickup_type, meetOutsideDisplay: "distance" }
+              : null,
+          };
+        }),
+    [drivers, myRides, driverHasOpenSeat]
+  );
+
+  const mapProps = {
+    homeAddress: user.address,
+    destinationAddress: addressForUniversity(user.university),
+    others: driverPins,
+    routeStops: bookedStops,
+    emptyHint: "Add your home address (see your profile) to see the map.",
+  };
+
   return (
     <div className="container" style={{ paddingTop: 36 }}>
       <div className="row" style={{ gap: 12, marginBottom: 4 }}>
         <span style={{ fontSize: 30 }} aria-hidden>🎒</span>
         <h1 style={{ fontSize: 30 }}>Rider dashboard</h1>
       </div>
-      <p className="muted" style={{ marginBottom: 26 }}>Browse driver routes and time slots headed your way.</p>
+      <p className="muted" style={{ marginBottom: 16 }}>Browse driver routes and time slots headed your way.</p>
 
-      <form onSubmit={handleSearch} className="row" style={{ marginBottom: 28, gap: 10 }}>
+      <CampusMap {...mapProps} variant="compact" onExpandRequest={() => setMapExpanded(true)} />
+      <MapLegend />
+
+      <form onSubmit={handleSearch} className="row" style={{ marginTop: 28, marginBottom: 28, gap: 10 }}>
         <input placeholder="From…" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} />
         <input placeholder="To…" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} />
         <button className="btn btn-primary" style={{ flexShrink: 0 }}>Search</button>
@@ -120,6 +191,8 @@ export default function RiderDashboard() {
           }}
         />
       )}
+
+      {mapExpanded && <MapModal {...mapProps} onClose={() => setMapExpanded(false)} />}
     </div>
   );
 }

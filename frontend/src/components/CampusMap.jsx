@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Tooltip, Polyline, useMap } from "reac
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { geocodeMany } from "../api/geocode";
+import { estimateMinutes, haversineMiles, formatMiles } from "../lib/geo";
 
 const ROUTE_COLOR = "#2D6CF6"; // var(--primary), hardcoded: Leaflet can't read CSS custom props
 const MATCH_COLOR = "#3FA66A"; // muted green, used only for map match/no-match status — the one
@@ -29,6 +30,58 @@ const STOP_ICON = pinIcon({ emoji: "📍", ring: ROUTE_COLOR, size: 22 });
 
 function personIcon(matching, kind) {
   return pinIcon({ emoji: kind === "driver" ? "🚗" : "🎒", ring: matching ? MATCH_COLOR : NO_MATCH_COLOR, size: 26 });
+}
+
+/**
+ * badge: { kind: 'pickup' | 'meet_outside', meetOutsideDisplay?: 'message' | 'distance' }
+ *  - 'pickup'      -> "+N min" estimated detour, from `home` to this person's pin.
+ *  - 'meet_outside' with meetOutsideDisplay:
+ *      'message'  -> a fixed "I can reach your apartment" note (driver's view of a rider
+ *                    who opted to meet outside — no need for a distance figure).
+ *      'distance' -> "X.X mi to reach" (rider's view of a driver they'd meet outside).
+ */
+function badgeText(home, personCoord, badge) {
+  if (!badge || !home || !personCoord) return null;
+  if (badge.kind === "pickup") {
+    const mins = estimateMinutes(home, personCoord);
+    return mins == null ? null : `+${mins} min`;
+  }
+  if (badge.kind === "meet_outside") {
+    if (badge.meetOutsideDisplay === "distance") {
+      const miles = formatMiles(haversineMiles(home, personCoord));
+      return miles ? `${miles} to reach` : null;
+    }
+    return "I can reach your apartment";
+  }
+  return null;
+}
+
+export function MapLegend() {
+  const items = [
+    { swatch: "#12172B", ring: ROUTE_COLOR, label: "Home / route" },
+    { swatch: "#12172B", ring: "#F6B62D", label: "Destination" },
+    { swatch: "#12172B", ring: MATCH_COLOR, label: "Matches your availability" },
+    { swatch: "#12172B", ring: NO_MATCH_COLOR, label: "No match" },
+  ];
+  return (
+    <div className="row" style={{ gap: 14, flexWrap: "wrap", marginTop: 10 }}>
+      {items.map((it) => (
+        <span key={it.label} className="row" style={{ gap: 6, fontSize: 12, color: "var(--text-muted)" }}>
+          <span
+            style={{
+              width: 12,
+              height: 12,
+              borderRadius: "50%",
+              background: it.swatch,
+              border: `2px solid ${it.ring}`,
+              display: "inline-block",
+            }}
+          />
+          {it.label}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function FitBounds({ points }) {
@@ -60,7 +113,7 @@ function FitBounds({ points }) {
 export default function CampusMap({
   homeAddress,
   destinationAddress,
-  others = [], // [{ id, address, matching, kind: 'driver'|'rider', name, badge: {type,value} }]
+  others = [], // [{ id, address, matching, kind: 'driver'|'rider', name?, badge?: {kind:'pickup'|'meet_outside', meetOutsideDisplay?} }]
   routeStops = [], // [address, ...] already-booked stops along the route (rider's view of a driver's route)
   variant = "compact", // "compact" | "expanded"
   onExpandRequest,
@@ -161,15 +214,18 @@ export default function CampusMap({
             <Marker key={`stop-${i}`} position={[c.lat, c.lng]} icon={STOP_ICON} />
           ))}
 
-          {othersWithCoords.map((o) => (
-            <Marker key={o.id} position={[o.coord.lat, o.coord.lng]} icon={personIcon(o.matching, o.kind)}>
-              {(o.name || o.badge) && (
-                <Tooltip permanent direction="right" offset={[14, 0]} className="cc-map-tooltip">
-                  {[o.name, o.badge?.value].filter(Boolean).join(" · ")}
-                </Tooltip>
-              )}
-            </Marker>
-          ))}
+          {othersWithCoords.map((o) => {
+            const text = [o.name, badgeText(home, o.coord, o.badge)].filter(Boolean).join(" · ");
+            return (
+              <Marker key={o.id} position={[o.coord.lat, o.coord.lng]} icon={personIcon(o.matching, o.kind)}>
+                {text && (
+                  <Tooltip permanent direction="right" offset={[14, 0]} className="cc-map-tooltip">
+                    {text}
+                  </Tooltip>
+                )}
+              </Marker>
+            );
+          })}
         </MapContainer>
       )}
 

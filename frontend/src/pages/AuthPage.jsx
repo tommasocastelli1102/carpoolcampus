@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import client, { apiErrorMessage } from "../api/client";
 import ComingSoonModal from "../components/ComingSoonModal";
 import { EyeIcon, EyeOffIcon, PlusIcon, XIcon } from "../components/Icons";
+import { UNIVERSITIES } from "../lib/universities";
 
 const PAYMENT_OPTIONS = [
   { value: "venmo", label: "Venmo" },
@@ -11,17 +12,6 @@ const PAYMENT_OPTIONS = [
   { value: "beer", label: "Beer" },
   { value: "aux_cord", label: "Aux cord / set the music" },
   { value: "coffee", label: "Coffee" },
-];
-
-const UNIVERSITIES = [
-  { value: "", label: "Select a university…", address: "" },
-  {
-    value: "ucla_anderson",
-    label: "UCLA Anderson School of Management",
-    address: "110 Westwood Plaza, Los Angeles, CA 90095",
-  },
-  { value: "ucla", label: "UCLA (University of California, Los Angeles)", address: "405 Hilgard Ave, Los Angeles, CA 90095" },
-  { value: "other", label: "Other / not listed", address: "" },
 ];
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];

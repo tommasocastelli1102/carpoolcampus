@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import client, { apiErrorMessage } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import ComingSoonModal from "../components/ComingSoonModal";
+import CampusMap, { MapLegend } from "../components/CampusMap";
+import MapModal from "../components/MapModal";
+import { addressForUniversity } from "../lib/universities";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -23,16 +26,20 @@ export default function DriverDashboard() {
   const [loading, setLoading] = useState(true);
   const [showAddSlot, setShowAddSlot] = useState(false);
   const [editRequest, setEditRequest] = useState(null);
+  const [riders, setRiders] = useState([]);
+  const [mapExpanded, setMapExpanded] = useState(false);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [{ data: allRides }, { data: mySlots }] = await Promise.all([
+      const [{ data: allRides }, { data: mySlots }, { data: allRiders }] = await Promise.all([
         client.get("/rides/my"),
         client.get("/availability", { params: { driver_id: user.id } }),
+        client.get("/users", { params: { role: "rider" } }),
       ]);
       setRequests(allRides.filter((r) => r.driver_id === user.id));
       setSlots(mySlots);
+      setRiders(allRiders);
     } finally {
       setLoading(false);
     }
@@ -53,6 +60,33 @@ export default function DriverDashboard() {
     load();
   };
 
+  // A rider "matches" this driver once they have any non-declined request
+  // relationship — riders never see each other, and drivers don't see
+  // rider names on the map, just where they'd need to go.
+  const riderPins = useMemo(
+    () =>
+      riders
+        .filter((r) => r.address)
+        .map((r) => {
+          const existingRequest = requests.find((req) => req.rider_id === r.id && req.status !== "declined");
+          return {
+            id: r.id,
+            address: r.address,
+            kind: "rider",
+            matching: Boolean(existingRequest),
+            badge: existingRequest ? { kind: existingRequest.pickup_type } : null,
+          };
+        }),
+    [riders, requests]
+  );
+
+  const mapProps = {
+    homeAddress: user.address,
+    destinationAddress: addressForUniversity(user.university),
+    others: riderPins,
+    emptyHint: "Add your home address (see your profile) to see the map.",
+  };
+
   return (
     <div className="container" style={{ paddingTop: 36 }}>
       <div className="row-between" style={{ marginBottom: 4 }}>
@@ -64,8 +98,12 @@ export default function DriverDashboard() {
           + Add availability
         </button>
       </div>
-      <p className="muted" style={{ marginBottom: 26 }}>Incoming ride requests, soonest first.</p>
+      <p className="muted" style={{ marginBottom: 16 }}>Incoming ride requests, soonest first.</p>
 
+      <CampusMap {...mapProps} variant="compact" onExpandRequest={() => setMapExpanded(true)} />
+      <MapLegend />
+
+      <h2 style={{ fontSize: 22, marginTop: 32, marginBottom: 16 }}>Incoming requests</h2>
       {loading ? (
         <div className="spinner" />
       ) : pending.length === 0 ? (
@@ -163,6 +201,8 @@ export default function DriverDashboard() {
           onClose={() => setEditRequest(null)}
         />
       )}
+
+      {mapExpanded && <MapModal {...mapProps} onClose={() => setMapExpanded(false)} />}
     </div>
   );
 }
