@@ -42,7 +42,6 @@ services:
   - type: web
     name: carpoolcampus-frontend
     runtime: static
-    plan: free
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
