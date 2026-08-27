@@ -377,6 +377,19 @@ textarea:focus {
   .btn {
     padding: 12px 20px;
   }
+
+  /* Expanded map: sidebar stacks above the map instead of squeezing
+     beside it (there's no room for a 300px rail on a phone screen). */
+  .mapmodal-body {
+    flex-direction: column;
+  }
+
+  .mapmodal-sidebar {
+    width: 100% !important;
+    max-height: 40%;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border);
+  }
 }
 
 @media (max-width: 480px) {
