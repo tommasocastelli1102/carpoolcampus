@@ -17,7 +17,7 @@ databases:
 services:
   - type: web
     name: carpoolcampus-backend
-    env: python
+    runtime: python
     plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt
@@ -41,7 +41,7 @@ services:
 
   - type: web
     name: carpoolcampus-frontend
-    env: static
+    runtime: static
     plan: free
     rootDir: frontend
     buildCommand: npm install && npm run build
