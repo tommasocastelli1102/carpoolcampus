@@ -1,15 +1,10 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import NotificationBell from "./NotificationBell";
+import ProfileMenu from "./ProfileMenu";
 
 export default function Navbar() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    logout();
-    navigate("/");
-  };
+  const { user } = useAuth();
 
   return (
     <header
@@ -33,7 +28,7 @@ export default function Navbar() {
           </span>
         </Link>
 
-        <nav className="row" style={{ gap: 20, flexShrink: 0, flexWrap: "nowrap" }}>
+        <nav className="row" style={{ gap: 16, flexShrink: 0, flexWrap: "nowrap" }}>
           {user ? (
             <>
               {(user.role === "driver" || user.role === "both") && (
@@ -46,13 +41,8 @@ export default function Navbar() {
                   🎒 Rider
                 </Link>
               )}
-              <span className="muted navbar-greeting" style={{ fontSize: 14, whiteSpace: "nowrap" }}>
-                Hi, {user.first_name}
-              </span>
               <NotificationBell />
-              <button className="btn btn-ghost btn-sm" onClick={handleLogout} style={{ flexShrink: 0 }}>
-                Log out
-              </button>
+              <ProfileMenu />
             </>
           ) : (
             <Link to="/auth">

@@ -12,6 +12,15 @@ export function BellIcon({ size = 20, color = "currentColor" }) {
   );
 }
 
+export function UserIcon({ size = 20, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <circle cx="12" cy="8.2" r="3.4" stroke={color} strokeWidth="1.6" />
+      <path d="M4.6 19.4c1.2-3.6 4-5.4 7.4-5.4s6.2 1.8 7.4 5.4" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function SteeringWheelIcon({ size = 40, color = "var(--primary-hover)" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>

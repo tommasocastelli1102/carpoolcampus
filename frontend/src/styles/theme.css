@@ -396,8 +396,4 @@ textarea:focus {
   .navbar-row {
     gap: 8px !important;
   }
-
-  .navbar-greeting {
-    display: none;
-  }
 }

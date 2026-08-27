@@ -27,3 +27,17 @@ export function formatMiles(miles) {
   if (miles == null) return null;
   return miles < 0.1 ? "<0.1 mi" : `${miles.toFixed(1)} mi`;
 }
+
+export function milesToKm(miles) {
+  return miles == null ? null : miles * 1.60934;
+}
+
+// EPA's cited average for a typical passenger vehicle is ~404 g CO2/mile
+// (~251 g/km). Each completed carpool trip is treated as one avoided
+// solo-car trip of the same distance — a documented estimate, not a
+// precise per-driver emissions model.
+const CO2_G_PER_KM = 251;
+
+export function co2SavedKg(totalKm) {
+  return (totalKm * CO2_G_PER_KM) / 1000;
+}
