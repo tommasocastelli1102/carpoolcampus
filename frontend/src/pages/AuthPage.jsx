@@ -37,8 +37,9 @@ const emptyForm = {
 export default function AuthPage() {
   const [searchParams] = useSearchParams();
   const initialRole = searchParams.get("role") === "driver" ? "driver" : "rider";
+  const initialMode = searchParams.get("mode") === "register" ? "register" : "login";
 
-  const [mode, setMode] = useState("login"); // "login" | "register"
+  const [mode, setMode] = useState(initialMode); // "login" | "register"
   const [role, setRole] = useState(initialRole);
   const [form, setForm] = useState(emptyForm);
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });

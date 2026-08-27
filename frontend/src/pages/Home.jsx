@@ -70,8 +70,8 @@ export default function Home() {
               </li>
             </ul>
             <div style={{ marginTop: "auto" }}>
-              <Link to="/auth?role=rider">
-                <button className="btn btn-primary btn-block">Log In / Register as a Rider</button>
+              <Link to="/auth?mode=register&role=rider">
+                <button className="btn btn-primary btn-block">Register as a Rider</button>
               </Link>
             </div>
           </div>
@@ -100,8 +100,8 @@ export default function Home() {
               </li>
             </ul>
             <div style={{ marginTop: "auto" }}>
-              <Link to="/auth?role=driver">
-                <button className="btn btn-primary btn-block">Log In / Register as a Driver</button>
+              <Link to="/auth?mode=register&role=driver">
+                <button className="btn btn-primary btn-block">Register as a Driver</button>
               </Link>
             </div>
           </div>
