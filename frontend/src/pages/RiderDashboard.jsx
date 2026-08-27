@@ -47,6 +47,12 @@ const SORT_OPTIONS = [
   { value: "newest", label: "Newest listed" },
 ];
 
+const CAMPUS_KEYWORDS = ["ucla", "anderson", "campus", "westwood plaza", "hilgard"];
+function isCampusText(text) {
+  const t = (text || "").toLowerCase();
+  return CAMPUS_KEYWORDS.some((kw) => t.includes(kw));
+}
+
 function timeBucket(startTime) {
   const hour = Number((startTime || "").slice(0, 2));
   if (hour < 12) return "morning";
@@ -152,6 +158,47 @@ function SuggestedRideCard({ slot, onSelect }) {
   );
 }
 
+const DIRECTION_OPTIONS = [
+  { value: "to_campus", label: "🎓 Go to campus" },
+  { value: "to_home", label: "🏠 Go home" },
+  { value: "other", label: "📍 Other destination" },
+];
+
+/** Which way are you headed — orients the map and narrows the list below
+ * to rides going that way, instead of mixing both directions together. */
+function DirectionSwitch({ direction, onChange, customDestination, onCustomDestinationChange }) {
+  return (
+    <div className="card-flat" style={{ marginBottom: 20 }}>
+      <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+        {DIRECTION_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className="btn btn-sm"
+            style={{
+              flex: "1 1 140px",
+              background: direction === opt.value ? "var(--primary)" : "transparent",
+              color: direction === opt.value ? "#fff" : "var(--text-muted)",
+              border: direction === opt.value ? "none" : "1px solid var(--border)",
+            }}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+      {direction === "other" && (
+        <input
+          value={customDestination}
+          onChange={(e) => onCustomDestinationChange(e.target.value)}
+          placeholder="Where are you headed? e.g. Santa Monica Pier"
+          style={{ marginTop: 10 }}
+        />
+      )}
+    </div>
+  );
+}
+
 export default function RiderDashboard() {
   const { user } = useAuth();
   const [slots, setSlots] = useState([]);
@@ -165,6 +212,11 @@ export default function RiderDashboard() {
   const [mapExpanded, setMapExpanded] = useState(false);
   const [riderCoord, setRiderCoord] = useState(null);
   const [driverCoords, setDriverCoords] = useState(new Map());
+
+  // Which way are you headed? Orients the map's home/destination pins and
+  // narrows the list to rides going that way.
+  const [direction, setDirection] = useState("to_campus"); // "to_campus" | "to_home" | "other"
+  const [customDestination, setCustomDestination] = useState("");
 
   // Filters — applied client-side over the fetched slots.
   const [maxDistance, setMaxDistance] = useState("");
@@ -288,9 +340,15 @@ export default function RiderDashboard() {
     }
   };
 
+  const campusAddress = addressForUniversity(user.university);
+  const orientedHomeAddress =
+    direction === "to_home" ? campusAddress : user.address;
+  const orientedDestinationAddress =
+    direction === "to_home" ? user.address : direction === "other" ? customDestination || campusAddress : campusAddress;
+
   const mapProps = {
-    homeAddress: user.address,
-    destinationAddress: addressForUniversity(user.university),
+    homeAddress: orientedHomeAddress,
+    destinationAddress: orientedDestinationAddress,
     others: driverPins,
     routeStops: bookedStops,
     onPersonClick: handlePersonClick,
@@ -306,6 +364,14 @@ export default function RiderDashboard() {
     );
     const candidates = slots
       .filter((s) => s.seats_available > 0 && !activeDriverIds.has(s.driver_id))
+      .filter((s) => {
+        if (direction === "to_campus") return isCampusText(s.route_to);
+        if (direction === "to_home") return isCampusText(s.route_from);
+        if (direction === "other" && customDestination.trim()) {
+          return s.route_to.toLowerCase().includes(customDestination.trim().toLowerCase());
+        }
+        return true;
+      })
       .map((s) => {
         const coord = s.driver?.address ? driverCoords.get(s.driver.address) : null;
         const distance = riderCoord && coord ? haversineMiles(riderCoord, coord) : null;
@@ -315,7 +381,7 @@ export default function RiderDashboard() {
     if (candidates.length === 0) return null;
     candidates.sort((a, b) => a._score - b._score);
     return candidates[0];
-  }, [slots, driverCoords, riderCoord, myRides]);
+  }, [slots, driverCoords, riderCoord, myRides, direction, customDestination]);
 
   const visibleSlots = useMemo(() => {
     let list = slots.map((s) => {
@@ -323,6 +389,16 @@ export default function RiderDashboard() {
       const distance = riderCoord && coord ? haversineMiles(riderCoord, coord) : null;
       return { ...s, _distance: distance };
     });
+
+    // Which way are you headed? "To campus" keeps rides ending near
+    // campus, "Going home" keeps rides starting from campus, "Other"
+    // matches whatever destination text was typed.
+    if (direction === "to_campus") list = list.filter((s) => isCampusText(s.route_to));
+    else if (direction === "to_home") list = list.filter((s) => isCampusText(s.route_from));
+    else if (direction === "other" && customDestination.trim()) {
+      const needle = customDestination.trim().toLowerCase();
+      list = list.filter((s) => s.route_to.toLowerCase().includes(needle));
+    }
 
     if (dayFilter !== "") list = list.filter((s) => String(s.day_of_week) === dayFilter);
     if (timeFilter) list = list.filter((s) => timeBucket(s.start_time) === timeFilter);
@@ -338,12 +414,12 @@ export default function RiderDashboard() {
       return b.id - a.id; // newest listed
     });
     return list;
-  }, [slots, driverCoords, riderCoord, dayFilter, timeFilter, sexFilter, minSeats, paymentFilter, maxDistance, sortBy]);
+  }, [slots, driverCoords, riderCoord, direction, customDestination, dayFilter, timeFilter, sexFilter, minSeats, paymentFilter, maxDistance, sortBy]);
 
-  // Start back at the first page whenever the filters/sort change the result set.
+  // Start back at the first page whenever the filters/direction/sort change the result set.
   useEffect(() => {
     setVisibleCount(RESULTS_PAGE_SIZE);
-  }, [dayFilter, timeFilter, sexFilter, minSeats, paymentFilter, maxDistance, sortBy]);
+  }, [direction, customDestination, dayFilter, timeFilter, sexFilter, minSeats, paymentFilter, maxDistance, sortBy]);
 
   return (
     <div className="container" style={{ paddingTop: 36 }}>
@@ -352,6 +428,13 @@ export default function RiderDashboard() {
         <h1 style={{ fontSize: 30 }}>Rider dashboard</h1>
       </div>
       <p className="muted" style={{ marginBottom: 16 }}>Browse driver routes and time slots headed your way.</p>
+
+      <DirectionSwitch
+        direction={direction}
+        onChange={setDirection}
+        customDestination={customDestination}
+        onCustomDestinationChange={setCustomDestination}
+      />
 
       {suggestedSlot && <SuggestedRideCard slot={suggestedSlot} onSelect={() => setSelected(suggestedSlot)} />}
 
