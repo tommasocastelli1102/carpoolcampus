@@ -174,6 +174,8 @@ export default function RiderDashboard() {
   const [minSeats, setMinSeats] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("");
   const [sortBy, setSortBy] = useState("distance");
+  const RESULTS_PAGE_SIZE = 5;
+  const [visibleCount, setVisibleCount] = useState(RESULTS_PAGE_SIZE);
 
   const loadSlots = async () => {
     setLoading(true);
@@ -338,6 +340,11 @@ export default function RiderDashboard() {
     return list;
   }, [slots, driverCoords, riderCoord, dayFilter, timeFilter, sexFilter, minSeats, paymentFilter, maxDistance, sortBy]);
 
+  // Start back at the first page whenever the filters/sort change the result set.
+  useEffect(() => {
+    setVisibleCount(RESULTS_PAGE_SIZE);
+  }, [dayFilter, timeFilter, sexFilter, minSeats, paymentFilter, maxDistance, sortBy]);
+
   return (
     <div className="container" style={{ paddingTop: 36 }}>
       <div className="row" style={{ gap: 12, marginBottom: 4 }}>
@@ -400,7 +407,7 @@ export default function RiderDashboard() {
         <p className="muted">No driver routes match yet — try clearing some filters.</p>
       ) : (
         <div className="stack">
-          {visibleSlots.map((slot) => (
+          {visibleSlots.slice(0, visibleCount).map((slot) => (
             <div key={slot.id} className="card-flat row-between">
               <div className="row" style={{ gap: 12, alignItems: "flex-start" }}>
                 <PersonAvatar photoUrl={slot.driver?.profile_photo_url} />
@@ -437,6 +444,15 @@ export default function RiderDashboard() {
               </button>
             </div>
           ))}
+          {visibleCount < visibleSlots.length && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-block"
+              onClick={() => setVisibleCount((c) => c + RESULTS_PAGE_SIZE)}
+            >
+              Load more ({visibleSlots.length - visibleCount} more)
+            </button>
+          )}
         </div>
       )}
 
