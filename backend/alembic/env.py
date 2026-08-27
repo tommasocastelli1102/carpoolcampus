@@ -13,7 +13,7 @@ if config.config_file_name is not None:
 
 # Use the DATABASE_URL from our own settings/.env instead of the placeholder
 # in alembic.ini, so there's one source of truth for the connection string.
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+config.set_main_option("sqlalchemy.url", get_settings().normalized_database_url)
 
 target_metadata = Base.metadata
 

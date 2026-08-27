@@ -16,6 +16,17 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
+    @property
+    def normalized_database_url(self) -> str:
+        # Hosted Postgres providers (Render, Heroku, ...) hand out
+        # "postgres://" connection strings; SQLAlchemy 1.4+ only accepts
+        # "postgresql://". Rewrite it rather than requiring every host's
+        # env var to already use the SQLAlchemy-flavored scheme.
+        url = self.database_url
+        if url.startswith("postgres://"):
+            url = "postgresql+psycopg2://" + url[len("postgres://"):]
+        return url
+
 
 @lru_cache
 def get_settings() -> Settings:

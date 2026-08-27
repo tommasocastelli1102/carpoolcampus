@@ -107,6 +107,50 @@ to the backend at `http://localhost:8000`, so no CORS setup is needed for
 local dev (the backend's `.env` already lists `http://localhost:5173` in
 `CORS_ORIGINS` in case you call it directly).
 
+## Deploying to Render
+
+`render.yaml` at the repo root is a Render "blueprint" that provisions all
+three pieces in one go: the FastAPI backend, a Postgres database, and the
+built React frontend as a static site.
+
+1. Push this repo to GitHub if you haven't already (it already lives at
+   `github.com/tommasocastelli1102/carpoolcampus`).
+2. Go to [render.com](https://render.com) and sign up/sign in with GitHub —
+   no separate password to manage. The free tier needs no credit card.
+3. **New → Blueprint**, pick the `carpoolcampus` repo. Render reads
+   `render.yaml` and shows you the three services it's about to create —
+   click **Apply**.
+4. First deploy takes a few minutes (installing Python + Node deps,
+   building the frontend, provisioning Postgres). The backend creates its
+   own tables automatically on first boot (same `Base.metadata.create_all()`
+   used locally — see the Schema note above), so there's no separate
+   migration step for a fresh database.
+5. Once live, open the backend service's **Shell** tab in the Render
+   dashboard and run `python seed.py` if you want the same demo data
+   (5 drivers, 5 riders, sample ride + review) as local dev.
+6. Grab the frontend's `https://carpoolcampus-frontend.onrender.com`-style
+   URL from its Render page — that's your live app.
+
+**If the service names were already taken** (Render then suffixes yours,
+e.g. `carpoolcampus-backend-ab12`): open the backend service's
+**Environment** tab and update `CORS_ORIGINS` to match your real frontend
+URL, then open the frontend service's **Environment** tab and update
+`VITE_API_BASE_URL` to match your real backend URL — trigger a manual
+redeploy on the frontend afterward so the new build picks it up (Vite bakes
+that value in at build time, not runtime).
+
+**Free-tier notes:**
+- The backend spins down after 15 minutes idle; the next request wakes it
+  up but takes ~30–50s. Fine for a demo, noticeable if a grader hits it cold.
+- Render's free Postgres plan is free for a limited window (check current
+  terms at signup) before it either needs upgrading (~$7/mo) or gets
+  deleted — the schema/seed script can always recreate it from scratch if
+  that happens.
+- A custom domain (if you buy one later) attaches to the **frontend**
+  static site for free — no plan upgrade needed. Add your domain's URL to
+  the backend's `CORS_ORIGINS` afterward or API calls from it will be
+  blocked.
+
 ## Project structure
 
 ```
