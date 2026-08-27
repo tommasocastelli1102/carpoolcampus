@@ -106,7 +106,10 @@ export default function AuthPage() {
         password: form.password,
         phone_number: form.phone_number || null,
         address: form.address || null,
-        university: UNIVERSITIES.find((u) => u.value === form.university)?.label || null,
+        // form.university === "" is the unselected placeholder option itself
+        // (it has value: "" so it'd otherwise match .find() below and save
+        // its own "Select a university…" label as if it were a real choice).
+        university: form.university ? UNIVERSITIES.find((u) => u.value === form.university)?.label || null : null,
         schedule_note: form.schedule_note || null,
         calendar_link: form.calendar_link || null,
         profile_photo_url: form.profile_photo_url || null,
