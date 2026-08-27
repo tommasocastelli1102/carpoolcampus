@@ -109,6 +109,49 @@ function PersonAvatar({ photoUrl, size = 40 }) {
   );
 }
 
+/** One card, above the map: the single closest available ride (with a
+ * small rating tiebreaker), so there's an obvious default pick instead of
+ * needing to scan the whole list. */
+function SuggestedRideCard({ slot, onSelect }) {
+  return (
+    <div
+      className="card"
+      style={{
+        marginBottom: 20,
+        background: "linear-gradient(120deg, var(--accent-dark), var(--surface))",
+        border: "1px solid var(--primary)",
+      }}
+    >
+      <div className="row-between" style={{ alignItems: "flex-start", gap: 16 }}>
+        <div className="row" style={{ gap: 14, alignItems: "flex-start" }}>
+          <PersonAvatar photoUrl={slot.driver?.profile_photo_url} size={52} />
+          <div>
+            <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+              ✨ Suggested for you
+            </div>
+            <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 2 }}>
+              {slot.route_from} → {slot.route_to}
+            </div>
+            <div className="muted" style={{ fontSize: 13, marginBottom: 6 }}>
+              {slotLabel(slot)}
+              {slot._distance != null ? ` · ${formatMiles(slot._distance)} from you` : ""}
+            </div>
+            <div className="row" style={{ gap: 8 }}>
+              <StarDisplay value={slot.driver?.driver_profile?.avg_rating} size={13} />
+              <span className="muted" style={{ fontSize: 13 }}>
+                {slot.driver?.first_name} {slot.driver?.last_name} · {slot.seats_available} seat(s) left
+              </span>
+            </div>
+          </div>
+        </div>
+        <button className="btn btn-primary btn-sm" style={{ flexShrink: 0 }} onClick={onSelect}>
+          View &amp; Request
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function RiderDashboard() {
   const { user } = useAuth();
   const [slots, setSlots] = useState([]);
@@ -252,6 +295,26 @@ export default function RiderDashboard() {
     emptyHint: "Add your home address (see your profile) to see the map.",
   };
 
+  // The single best pick, shown as one card above the map — closest
+  // available ride, with a small rating tiebreaker, excluding drivers the
+  // rider already has an active request with.
+  const suggestedSlot = useMemo(() => {
+    const activeDriverIds = new Set(
+      myRides.filter((r) => r.status === "pending" || r.status === "confirmed").map((r) => r.driver_id)
+    );
+    const candidates = slots
+      .filter((s) => s.seats_available > 0 && !activeDriverIds.has(s.driver_id))
+      .map((s) => {
+        const coord = s.driver?.address ? driverCoords.get(s.driver.address) : null;
+        const distance = riderCoord && coord ? haversineMiles(riderCoord, coord) : null;
+        const rating = s.driver?.driver_profile?.avg_rating || 0;
+        return { ...s, _distance: distance, _score: (distance ?? 50) - rating * 0.3 };
+      });
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) => a._score - b._score);
+    return candidates[0];
+  }, [slots, driverCoords, riderCoord, myRides]);
+
   const visibleSlots = useMemo(() => {
     let list = slots.map((s) => {
       const coord = s.driver?.address ? driverCoords.get(s.driver.address) : null;
@@ -282,6 +345,8 @@ export default function RiderDashboard() {
         <h1 style={{ fontSize: 30 }}>Rider dashboard</h1>
       </div>
       <p className="muted" style={{ marginBottom: 16 }}>Browse driver routes and time slots headed your way.</p>
+
+      {suggestedSlot && <SuggestedRideCard slot={suggestedSlot} onSelect={() => setSelected(suggestedSlot)} />}
 
       <CampusMap {...mapProps} variant="compact" onExpandRequest={() => setMapExpanded(true)} />
       <MapLegend />
