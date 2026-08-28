@@ -459,156 +459,164 @@ export default function RiderDashboard() {
       <CampusMap {...mapProps} variant="compact" onExpandRequest={() => setMapExpanded(true)} />
       <MapLegend />
 
-      <h2 style={{ fontSize: 20, marginTop: 28, marginBottom: 14 }}>Choose a ride</h2>
+      <div className="card" style={{ marginTop: 28, marginBottom: 20 }}>
+        <h2 style={{ fontSize: 20, marginBottom: 14 }}>Choose a ride</h2>
 
-      {loading ? (
-        <div className="spinner" />
-      ) : visibleSlots.length === 0 ? (
-        <p className="muted">No driver routes match yet — try clearing some filters.</p>
-      ) : (
-        <div className="stack">
-          {visibleSlots.slice(0, visibleCount).map((slot) => (
-            <RideOptionRow
-              key={slot.id}
-              slot={slot}
-              isNext={slot.id === nextAvailableSlot?.id}
-              active={selectedSlotId === slot.id}
-              onClick={() => setSelectedSlotId(slot.id)}
-            />
-          ))}
-          {visibleCount < visibleSlots.length && (
+        {loading ? (
+          <div className="spinner" />
+        ) : visibleSlots.length === 0 ? (
+          <p className="muted">No driver routes match yet — try clearing some filters.</p>
+        ) : (
+          <div className="stack">
+            {visibleSlots.slice(0, visibleCount).map((slot) => (
+              <RideOptionRow
+                key={slot.id}
+                slot={slot}
+                isNext={slot.id === nextAvailableSlot?.id}
+                active={selectedSlotId === slot.id}
+                onClick={() => setSelectedSlotId(slot.id)}
+              />
+            ))}
+            {visibleCount < visibleSlots.length && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-block"
+                onClick={() => setVisibleCount((c) => c + RESULTS_PAGE_SIZE)}
+              >
+                Load more ({visibleSlots.length - visibleCount} more)
+              </button>
+            )}
             <button
               type="button"
-              className="btn btn-ghost btn-block"
-              onClick={() => setVisibleCount((c) => c + RESULTS_PAGE_SIZE)}
+              className="btn btn-primary btn-block"
+              disabled={!selectedSlotId}
+              onClick={() => setSelected(visibleSlots.find((s) => s.id === selectedSlotId))}
+              style={{ marginTop: 4 }}
             >
-              Load more ({visibleSlots.length - visibleCount} more)
+              {selectedSlotId ? "Request ride" : "Select a ride"}
             </button>
-          )}
-          <button
-            type="button"
-            className="btn btn-primary btn-block"
-            disabled={!selectedSlotId}
-            onClick={() => setSelected(visibleSlots.find((s) => s.id === selectedSlotId))}
-            style={{ marginTop: 4 }}
-          >
-            {selectedSlotId ? "Request ride" : "Select a ride"}
-          </button>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
 
       {hasCar && (
         <>
-          <h2 id="incoming-requests" style={{ fontSize: 20, marginTop: 40, marginBottom: 14 }}>Incoming requests</h2>
-          {driverLoading ? (
-            <div className="spinner" />
-          ) : pendingDriverRequests.length === 0 ? (
-            <p className="muted">No pending requests right now.</p>
-          ) : (
-            <div className="stack">
-              {pendingDriverRequests.map((r) => (
-                <div key={r.id} className="card-flat row-between">
-                  <div>
-                    <div style={{ fontWeight: 700, marginBottom: 4 }}>
-                      {r.rider?.first_name} {r.rider?.last_name}
-                    </div>
-                    <div className="muted" style={{ fontSize: 13 }}>
-                      {r.custom_time
-                        ? new Date(r.custom_time).toLocaleString()
-                        : r.availability
-                        ? `${r.availability.start_time.slice(0, 5)}–${r.availability.end_time.slice(0, 5)}`
-                        : "Time TBD"}
-                      {" · "}
-                      {r.pickup_type === "pickup" ? "Pickup" : "Meet outside their place"}
-                      {r.custom_place ? ` at ${r.custom_place}` : r.availability ? ` near ${r.availability.route_from}` : ""}
-                    </div>
-                  </div>
-                  <div className="row" style={{ gap: 8 }}>
-                    <button className="btn btn-sm btn-ghost" onClick={() => setEditRequest(r)}>
-                      Request Edit
-                    </button>
-                    <button className="btn btn-sm btn-danger" onClick={() => actOnRequest(r.id, "declined")}>
-                      Decline
-                    </button>
-                    <button className="btn btn-sm btn-primary" onClick={() => actOnRequest(r.id, "confirmed")}>
-                      Accept
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {otherDriverRequests.length > 0 && (
-            <>
-              <h2 style={{ fontSize: 20, marginTop: 28, marginBottom: 14 }}>Other requests</h2>
+          <div className="card" style={{ marginBottom: 20 }}>
+            <h2 id="incoming-requests" style={{ fontSize: 20, marginBottom: 14 }}>Incoming requests</h2>
+            {driverLoading ? (
+              <div className="spinner" />
+            ) : pendingDriverRequests.length === 0 ? (
+              <p className="muted">No pending requests right now.</p>
+            ) : (
               <div className="stack">
-                {otherDriverRequests.map((r) => (
+                {pendingDriverRequests.map((r) => (
                   <div key={r.id} className="card-flat row-between">
                     <div>
                       <div style={{ fontWeight: 700, marginBottom: 4 }}>
                         {r.rider?.first_name} {r.rider?.last_name}
                       </div>
                       <div className="muted" style={{ fontSize: 13 }}>
-                        {r.availability ? `${r.availability.route_from} → ${r.availability.route_to}` : r.custom_place}
+                        {r.custom_time
+                          ? new Date(r.custom_time).toLocaleString()
+                          : r.availability
+                          ? `${r.availability.start_time.slice(0, 5)}–${r.availability.end_time.slice(0, 5)}`
+                          : "Time TBD"}
+                        {" · "}
+                        {r.pickup_type === "pickup" ? "Pickup" : "Meet outside their place"}
+                        {r.custom_place ? ` at ${r.custom_place}` : r.availability ? ` near ${r.availability.route_from}` : ""}
                       </div>
                     </div>
-                    <div className="row" style={{ gap: 10 }}>
-                      <span className={`badge badge-${r.status}`}>{r.status}</span>
-                      {r.status === "confirmed" && (
-                        <>
-                          <Link to={`/chat/${r.id}`}>
-                            <button className="btn btn-sm btn-primary">Chat</button>
-                          </Link>
-                          <button className="btn btn-sm btn-ghost" onClick={() => actOnRequest(r.id, "completed")}>
-                            Mark completed
-                          </button>
-                        </>
-                      )}
+                    <div className="row" style={{ gap: 8 }}>
+                      <button className="btn btn-sm btn-ghost" onClick={() => setEditRequest(r)}>
+                        Request Edit
+                      </button>
+                      <button className="btn btn-sm btn-danger" onClick={() => actOnRequest(r.id, "declined")}>
+                        Decline
+                      </button>
+                      <button className="btn btn-sm btn-primary" onClick={() => actOnRequest(r.id, "confirmed")}>
+                        Accept
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
-            </>
-          )}
+            )}
 
-          <h2 style={{ fontSize: 20, marginTop: 28, marginBottom: 14 }}>My availability</h2>
-          {driverSlots.length === 0 ? (
-            <p className="muted">You haven't posted any availability yet.</p>
-          ) : (
-            <div className="stack">
-              {driverSlots.map((s) => (
-                <div key={s.id} className="card-flat">
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>{s.route_from} → {s.route_to}</div>
-                  <div className="muted" style={{ fontSize: 13 }}>
-                    {s.date ? s.date : s.day_of_week != null ? `${DAYS_FULL[s.day_of_week]}s` : "One-off"} ·{" "}
-                    {s.start_time.slice(0, 5)}–{s.end_time.slice(0, 5)} · {s.seats_available} seat(s)
-                  </div>
+            {otherDriverRequests.length > 0 && (
+              <>
+                <h3 style={{ fontSize: 15, marginTop: 24, marginBottom: 12 }}>Other requests</h3>
+                <div className="stack">
+                  {otherDriverRequests.map((r) => (
+                    <div key={r.id} className="card-flat row-between">
+                      <div>
+                        <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                          {r.rider?.first_name} {r.rider?.last_name}
+                        </div>
+                        <div className="muted" style={{ fontSize: 13 }}>
+                          {r.availability ? `${r.availability.route_from} → ${r.availability.route_to}` : r.custom_place}
+                        </div>
+                      </div>
+                      <div className="row" style={{ gap: 10 }}>
+                        <span className={`badge badge-${r.status}`}>{r.status}</span>
+                        {r.status === "confirmed" && (
+                          <>
+                            <Link to={`/chat/${r.id}`}>
+                              <button className="btn btn-sm btn-primary">Chat</button>
+                            </Link>
+                            <button className="btn btn-sm btn-ghost" onClick={() => actOnRequest(r.id, "completed")}>
+                              Mark completed
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              </>
+            )}
 
-          {editRequest && (
-            <ComingSoonModal
-              title="Request Edit"
-              message="Suggesting a different time/place is available soon."
-              onClose={() => setEditRequest(null)}
-            />
-          )}
+            {editRequest && (
+              <ComingSoonModal
+                title="Request Edit"
+                message="Suggesting a different time/place is available soon."
+                onClose={() => setEditRequest(null)}
+              />
+            )}
+          </div>
+
+          <div className="card" style={{ marginBottom: 20 }}>
+            <h2 style={{ fontSize: 20, marginBottom: 14 }}>My availability</h2>
+            {driverSlots.length === 0 ? (
+              <p className="muted">You haven't posted any availability yet.</p>
+            ) : (
+              <div className="stack">
+                {driverSlots.map((s) => (
+                  <div key={s.id} className="card-flat">
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>{s.route_from} → {s.route_to}</div>
+                    <div className="muted" style={{ fontSize: 13 }}>
+                      {s.date ? s.date : s.day_of_week != null ? `${DAYS_FULL[s.day_of_week]}s` : "One-off"} ·{" "}
+                      {s.start_time.slice(0, 5)}–{s.end_time.slice(0, 5)} · {s.seats_available} seat(s)
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </>
       )}
 
-      <h2 style={{ fontSize: 22, marginTop: 48, marginBottom: 16 }}>My last rides</h2>
-      {myRides.length === 0 ? (
-        <p className="muted">You haven't requested any rides yet.</p>
-      ) : (
-        <div className="stack">
-          {myRides.map((r) => (
-            <MyRideRow key={r.id} ride={r} />
-          ))}
-        </div>
-      )}
+      <div className="card" style={{ marginTop: 28, marginBottom: 20 }}>
+        <h2 style={{ fontSize: 20, marginBottom: 14 }}>My last rides</h2>
+        {myRides.length === 0 ? (
+          <p className="muted">You haven't requested any rides yet.</p>
+        ) : (
+          <div className="stack">
+            {myRides.map((r) => (
+              <MyRideRow key={r.id} ride={r} />
+            ))}
+          </div>
+        )}
+      </div>
 
       {selected && (
         <RouteDetailModal
