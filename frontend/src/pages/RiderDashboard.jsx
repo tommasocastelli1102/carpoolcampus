@@ -63,6 +63,43 @@ function slotLabel(slot) {
   return `${when} · ${slot.start_time.slice(0, 5)}–${slot.end_time.slice(0, 5)}`;
 }
 
+/** Minutes from `now` until this slot's next occurrence — a one-off date
+ * compares directly, a recurring day/time rolls forward to the closest
+ * upcoming weekday (today included, if its time hasn't passed yet). Used
+ * to sort "Choose a ride" so the very next ride you could catch is the
+ * one on top. `now` is passed in (rather than read fresh here) so every
+ * slot in the same list is compared against the exact same instant —
+ * otherwise same-time slots would "tie" by a few stray milliseconds and
+ * the distance tiebreaker below would never actually apply. */
+function minutesUntilNext(slot, now = new Date()) {
+  const [h, m] = slot.start_time.split(":").map(Number);
+  if (slot.date) {
+    const target = new Date(`${slot.date}T00:00:00`);
+    target.setHours(h, m, 0, 0);
+    return (target - now) / 60000;
+  }
+  if (slot.day_of_week != null) {
+    const jsDay = now.getDay(); // 0=Sun..6=Sat
+    const ourDay = (jsDay + 6) % 7; // 0=Mon..6=Sun, matching day_of_week
+    let dayDiff = slot.day_of_week - ourDay;
+    if (dayDiff < 0) dayDiff += 7;
+    const target = new Date(now);
+    target.setDate(now.getDate() + dayDiff);
+    target.setHours(h, m, 0, 0);
+    if (dayDiff === 0 && target < now) target.setDate(target.getDate() + 7);
+    return (target - now) / 60000;
+  }
+  return Infinity;
+}
+
+/** "in 40m", "in 3h", "in 2d" — how far off a slot's next occurrence is. */
+function formatTimeUntil(minutes) {
+  if (!Number.isFinite(minutes)) return null;
+  if (minutes < 60) return `in ${Math.max(1, Math.round(minutes))}m`;
+  if (minutes < 60 * 24) return `in ${Math.round(minutes / 60)}h`;
+  return `in ${Math.round(minutes / (60 * 24))}d`;
+}
+
 const REVIEW_CATEGORIES = [
   { key: "stars_drive_safety", label: "Drive safety" },
   { key: "stars_clean_car", label: "Clean car" },
@@ -363,9 +400,19 @@ export default function RiderDashboard() {
     if (dayFilter !== "") list = list.filter((s) => String(s.day_of_week) === dayFilter);
     if (timeFilter) list = list.filter((s) => timeBucket(s.start_time) === timeFilter);
 
-    list.sort((a, b) => (a._distance ?? Infinity) - (b._distance ?? Infinity));
+    // Soonest next occurrence first — the top of "Choose a ride" is
+    // always the next ride you could actually catch, not just the
+    // closest one. Distance breaks ties.
+    const now = new Date();
+    list = list.map((s) => ({ ...s, _minutesUntil: minutesUntilNext(s, now) }));
+    list.sort((a, b) => a._minutesUntil - b._minutesUntil || (a._distance ?? Infinity) - (b._distance ?? Infinity));
     return list;
   }, [slots, driverCoords, riderCoord, direction, fromText, toText, dayFilter, timeFilter]);
+
+  // The soonest ride that actually has an open seat — badged in the list
+  // below, separately from just "first in the sorted list" (which could
+  // be a soonest-but-full slot).
+  const nextAvailableSlot = visibleSlots.find((s) => s.seats_available > 0);
 
   // Start back at the first page, and clear any selected ride, whenever
   // the filters/direction change the result set out from under it.
@@ -424,6 +471,7 @@ export default function RiderDashboard() {
             <RideOptionRow
               key={slot.id}
               slot={slot}
+              isNext={slot.id === nextAvailableSlot?.id}
               active={selectedSlotId === slot.id}
               onClick={() => setSelectedSlotId(slot.id)}
             />
@@ -627,8 +675,11 @@ export default function RiderDashboard() {
 
 /** One selectable row in "Choose a ride" — tapping it highlights it
  * (Uber-style), it doesn't jump straight into the request flow. That
- * happens when the "Request ride" button below the list is pressed. */
-function RideOptionRow({ slot, active, onClick }) {
+ * happens when the "Request ride" button below the list is pressed.
+ * The list is sorted soonest-first, and `isNext` badges whichever row
+ * is the next ride you could actually catch (i.e. still has a seat). */
+function RideOptionRow({ slot, isNext, active, onClick }) {
+  const timeUntil = formatTimeUntil(slot._minutesUntil);
   return (
     <button
       type="button"
@@ -642,12 +693,17 @@ function RideOptionRow({ slot, active, onClick }) {
         width: "100%",
         textAlign: "left",
         cursor: "pointer",
-        border: active ? "2px solid var(--text)" : "1px solid var(--border)",
+        border: active ? "2px solid var(--text)" : isNext ? "1px solid var(--primary)" : "1px solid var(--border)",
       }}
     >
       <div className="row" style={{ gap: 12, alignItems: "flex-start", minWidth: 0 }}>
         <PersonAvatar />
         <div style={{ minWidth: 0 }}>
+          {isNext && (
+            <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--primary-hover)", marginBottom: 3 }}>
+              🕐 Next available
+            </div>
+          )}
           <div className="row" style={{ gap: 8 }}>
             <span
               title={slot.seats_available > 0 ? "Available at this time" : "No open seats"}
@@ -669,6 +725,7 @@ function RideOptionRow({ slot, active, onClick }) {
           </div>
           <div className="muted" style={{ fontSize: 13 }}>
             {slotLabel(slot)}
+            {timeUntil ? ` · ${timeUntil}` : ""}
             {slot._distance != null ? ` · ${formatMiles(slot._distance)} away` : ""}
           </div>
         </div>
