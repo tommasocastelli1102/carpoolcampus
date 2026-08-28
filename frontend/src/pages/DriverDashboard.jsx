@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import client, { apiErrorMessage } from "../api/client";
+import client from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import ComingSoonModal from "../components/ComingSoonModal";
 import CampusMap, { MapLegend } from "../components/CampusMap";
 import MapModal from "../components/MapModal";
-import RouteSearchBar from "../components/RouteSearchBar";
+import AddAvailabilityForm from "../components/AddAvailabilityForm";
 import { addressForUniversity } from "../lib/universities";
 import { isCampusText, CAMPUS_SEARCH_TEXT } from "../lib/campus";
 
@@ -30,19 +30,11 @@ export default function DriverDashboard() {
   const [riders, setRiders] = useState([]);
   const [mapExpanded, setMapExpanded] = useState(false);
 
-  // The route being posted — same From/To + Campus/Home shortcut bar the
-  // rider dashboard searches with; here it describes the route you're
-  // offering instead of one you're looking for.
-  const [fromText, setFromText] = useState(user.address || "");
-  const [toText, setToText] = useState(CAMPUS_SEARCH_TEXT);
-  const [dayOfWeek, setDayOfWeek] = useState("0");
-  const [startTime, setStartTime] = useState("08:00");
-  const [endTime, setEndTime] = useState("09:00");
-  const [seats, setSeats] = useState(3);
-  const [postError, setPostError] = useState("");
-  const [posting, setPosting] = useState(false);
-
-  const direction = isCampusText(toText) ? "to_campus" : isCampusText(fromText) ? "to_home" : "custom";
+  // What's currently typed into the route-posting form below, just for
+  // orienting the map the same way the rider dashboard does — the form
+  // itself owns the rest of its state (see AddAvailabilityForm).
+  const [postFields, setPostFields] = useState({ from: user.address || "", to: CAMPUS_SEARCH_TEXT });
+  const direction = isCampusText(postFields.to) ? "to_campus" : isCampusText(postFields.from) ? "to_home" : "custom";
 
   const load = async () => {
     setLoading(true);
@@ -73,43 +65,6 @@ export default function DriverDashboard() {
   const act = async (id, status) => {
     await client.patch(`/rides/request/${id}`, { status });
     load();
-  };
-
-  const handlePostRoute = async (e) => {
-    e.preventDefault();
-    if (!fromText.trim() || !toText.trim()) {
-      setPostError("Add both a from and to location.");
-      return;
-    }
-    setPostError("");
-    setPosting(true);
-    try {
-      await client.post("/availability", {
-        day_of_week: Number(dayOfWeek),
-        start_time: startTime,
-        end_time: endTime,
-        route_from: fromText.trim(),
-        route_to: toText.trim(),
-        seats_available: Number(seats),
-      });
-      setFromText("");
-      setToText("");
-      load();
-    } catch (err) {
-      setPostError(apiErrorMessage(err, "Couldn't save that route."));
-    } finally {
-      setPosting(false);
-    }
-  };
-
-  const handleCampusClick = () => {
-    setFromText(user.address || "Home");
-    setToText(CAMPUS_SEARCH_TEXT);
-  };
-
-  const handleHomeClick = () => {
-    setFromText(CAMPUS_SEARCH_TEXT);
-    setToText(user.address || "Home");
   };
 
   // A rider "matches" this driver once they have any non-declined request
@@ -151,40 +106,11 @@ export default function DriverDashboard() {
       </div>
       <p className="muted" style={{ marginBottom: 16 }}>Post the route you're driving, then manage requests below.</p>
 
-      <RouteSearchBar
-        from={fromText}
-        to={toText}
-        onFromChange={setFromText}
-        onToChange={setToText}
-        onCampus={handleCampusClick}
-        onHome={handleHomeClick}
-        onSubmit={handlePostRoute}
-        submitLabel={posting ? "Posting…" : "Post route"}
-      >
-        <div className="field-row" style={{ flexBasis: "100%", marginTop: 10, marginBottom: 0 }}>
-          <div className="field" style={{ marginBottom: 0 }}>
-            <label style={{ fontSize: 11 }}>Day</label>
-            <select value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value)}>
-              {DAYS.map((d, i) => (
-                <option key={d} value={i}>{d}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field" style={{ marginBottom: 0 }}>
-            <label style={{ fontSize: 11 }}>Start</label>
-            <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-          </div>
-          <div className="field" style={{ marginBottom: 0 }}>
-            <label style={{ fontSize: 11 }}>End</label>
-            <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-          </div>
-          <div className="field" style={{ marginBottom: 0 }}>
-            <label style={{ fontSize: 11 }}>Seats</label>
-            <input type="number" min={1} max={8} value={seats} onChange={(e) => setSeats(e.target.value)} />
-          </div>
-        </div>
-        {postError && <p className="error-text" style={{ flexBasis: "100%", marginTop: 8, marginBottom: 0 }}>{postError}</p>}
-      </RouteSearchBar>
+      <AddAvailabilityForm
+        user={user}
+        onSaved={load}
+        onFieldsChange={(from, to) => setPostFields({ from, to })}
+      />
 
       <CampusMap {...mapProps} variant="compact" onExpandRequest={() => setMapExpanded(true)} />
       <MapLegend />

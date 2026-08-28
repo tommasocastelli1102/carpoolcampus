@@ -8,6 +8,7 @@ import { StarDisplay } from "../components/StarRating";
 import CampusMap, { MapLegend } from "../components/CampusMap";
 import MapModal from "../components/MapModal";
 import RouteSearchBar from "../components/RouteSearchBar";
+import AddAvailabilityForm from "../components/AddAvailabilityForm";
 import { addressForUniversity } from "../lib/universities";
 import { isCampusText, CAMPUS_SEARCH_TEXT } from "../lib/campus";
 import { CarIcon } from "../components/Icons";
@@ -148,7 +149,7 @@ function SuggestedRideCard({ slot, onSelect }) {
 }
 
 export default function RiderDashboard() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -160,6 +161,8 @@ export default function RiderDashboard() {
   const [mapExpanded, setMapExpanded] = useState(false);
   const [riderCoord, setRiderCoord] = useState(null);
   const [driverCoords, setDriverCoords] = useState(new Map());
+  const [showAddAvailability, setShowAddAvailability] = useState(false);
+  const [enablingDriving, setEnablingDriving] = useState(false);
 
   // Which way are you headed? Derived straight from the From/To text —
   // orients the map's home/destination pins and narrows the list below to
@@ -229,6 +232,25 @@ export default function RiderDashboard() {
     setFromText(CAMPUS_SEARCH_TEXT);
     setToText("");
     loadSlots({ from: CAMPUS_SEARCH_TEXT, to: "" });
+  };
+
+  // Riders who don't have a car on file yet get flipped to role "both"
+  // on the fly — having a car isn't a permanent choice, so there's no
+  // reason to make someone leave this page to unlock posting a route.
+  const handleAddAvailabilityClick = async () => {
+    if (user.role === "rider") {
+      setEnablingDriving(true);
+      try {
+        const { data } = await client.post("/auth/enable-driving", {});
+        setUser(data);
+      } catch {
+        // Non-fatal — the form below still lets them try; worst case the
+        // post fails and they see that error instead.
+      } finally {
+        setEnablingDriving(false);
+      }
+    }
+    setShowAddAvailability(true);
   };
 
   // Geocode "my apartment" once, and every distinct driver address in the
@@ -395,9 +417,14 @@ export default function RiderDashboard() {
 
   return (
     <div className="container" style={{ paddingTop: 36 }}>
-      <div className="row" style={{ gap: 12, marginBottom: 4 }}>
-        <span style={{ fontSize: 30 }} aria-hidden>🎒</span>
-        <h1 style={{ fontSize: 30 }}>Rider dashboard</h1>
+      <div className="row-between" style={{ marginBottom: 4 }}>
+        <div className="row" style={{ gap: 12 }}>
+          <span style={{ fontSize: 30 }} aria-hidden>🎒</span>
+          <h1 style={{ fontSize: 30 }}>Rider dashboard</h1>
+        </div>
+        <button className="btn btn-primary btn-sm" onClick={handleAddAvailabilityClick} disabled={enablingDriving}>
+          {enablingDriving ? "One sec…" : "+ Add availability"}
+        </button>
       </div>
       <p className="muted" style={{ marginBottom: 16 }}>Browse driver routes and time slots headed your way.</p>
 
@@ -522,6 +549,28 @@ export default function RiderDashboard() {
       )}
 
       {mapExpanded && <MapModal {...mapProps} onClose={() => setMapExpanded(false)} />}
+
+      {showAddAvailability && (
+        <div className="modal-backdrop" onClick={() => setShowAddAvailability(false)}>
+          <div className="modal" style={{ maxWidth: 560, textAlign: "left" }} onClick={(e) => e.stopPropagation()}>
+            <div className="row-between" style={{ marginBottom: 16 }}>
+              <h3>Add availability</h3>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                style={{ width: "auto", padding: "4px 10px" }}
+                onClick={() => setShowAddAvailability(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <AddAvailabilityForm
+              user={user}
+              onSaved={() => setShowAddAvailability(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
