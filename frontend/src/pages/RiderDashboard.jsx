@@ -104,55 +104,14 @@ function PersonAvatar({ photoUrl, size = 40 }) {
   );
 }
 
-/** One card, above the map: the single closest available ride (with a
- * small rating tiebreaker), so there's an obvious default pick instead of
- * needing to scan the whole list. */
-function SuggestedRideCard({ slot, onSelect }) {
-  return (
-    <div
-      className="card"
-      style={{
-        marginBottom: 20,
-        background: "linear-gradient(120deg, var(--accent-dark), var(--surface))",
-        border: "1px solid var(--primary)",
-      }}
-    >
-      <div className="row-between" style={{ alignItems: "flex-start", gap: 16 }}>
-        <div className="row" style={{ gap: 14, alignItems: "flex-start" }}>
-          <PersonAvatar photoUrl={slot.driver?.profile_photo_url} size={52} />
-          <div>
-            <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
-              ✨ Suggested for you
-            </div>
-            <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 2 }}>
-              {slot.route_from} → {slot.route_to}
-            </div>
-            <div className="muted" style={{ fontSize: 13, marginBottom: 6 }}>
-              {slotLabel(slot)}
-              {slot._distance != null ? ` · ${formatMiles(slot._distance)} from you` : ""}
-            </div>
-            <div className="row" style={{ gap: 8 }}>
-              <StarDisplay value={slot.driver?.driver_profile?.avg_rating} size={13} />
-              <span className="muted" style={{ fontSize: 13 }}>
-                {slot.driver?.first_name} {slot.driver?.last_name} · {slot.seats_available} seat(s) left
-              </span>
-            </div>
-          </div>
-        </div>
-        <button className="btn btn-primary btn-sm" style={{ flexShrink: 0 }} onClick={onSelect}>
-          View &amp; Request
-        </button>
-      </div>
-    </div>
-  );
-}
 
 export default function RiderDashboard() {
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState(null); // slot whose request modal is open
+  const [selectedSlotId, setSelectedSlotId] = useState(null); // which ride is highlighted in the list, like tapping a ride in Uber
   const [myRides, setMyRides] = useState([]);
   const [fromText, setFromText] = useState("");
   const [toText, setToText] = useState(CAMPUS_SEARCH_TEXT); // defaults to "headed to campus"
@@ -328,12 +287,13 @@ export default function RiderDashboard() {
     [drivers, myRides, driverHasOpenSeat, slots]
   );
 
-  // Clicking a driver's icon on the (expanded, interactive) map opens the
-  // same View & Request flow as clicking a row in the list below.
+  // Clicking a driver's icon on the (expanded, interactive) map selects
+  // that ride below, same as tapping its row — it doesn't jump straight
+  // into the request flow.
   const handlePersonClick = (person) => {
     const slot = slots.find((s) => s.driver_id === person.id && s.seats_available > 0) || slots.find((s) => s.driver_id === person.id);
     if (slot) {
-      setSelected(slot);
+      setSelectedSlotId(slot.id);
       setMapExpanded(false);
     }
   };
@@ -353,36 +313,6 @@ export default function RiderDashboard() {
     onPersonClick: handlePersonClick,
     emptyHint: "Add your home address (see your profile) to see the map.",
   };
-
-  // The single best pick, shown as one card above the map — closest
-  // available ride, with a small rating tiebreaker, excluding drivers the
-  // rider already has an active request with.
-  const suggestedSlot = useMemo(() => {
-    const activeDriverIds = new Set(
-      myRides.filter((r) => r.status === "pending" || r.status === "confirmed").map((r) => r.driver_id)
-    );
-    const candidates = slots
-      .filter((s) => s.seats_available > 0 && !activeDriverIds.has(s.driver_id))
-      .filter((s) => {
-        if (direction === "to_campus") return isCampusText(s.route_to);
-        if (direction === "to_home") return isCampusText(s.route_from);
-        // custom: match whatever's typed in From/To, on whichever field(s) have text
-        const fromNeedle = fromText.trim().toLowerCase();
-        const toNeedle = toText.trim().toLowerCase();
-        const fromOk = !fromNeedle || s.route_from.toLowerCase().includes(fromNeedle);
-        const toOk = !toNeedle || s.route_to.toLowerCase().includes(toNeedle);
-        return fromOk && toOk;
-      })
-      .map((s) => {
-        const coord = s.driver?.address ? driverCoords.get(s.driver.address) : null;
-        const distance = riderCoord && coord ? haversineMiles(riderCoord, coord) : null;
-        const rating = s.driver?.driver_profile?.avg_rating || 0;
-        return { ...s, _distance: distance, _score: (distance ?? 50) - rating * 0.3 };
-      });
-    if (candidates.length === 0) return null;
-    candidates.sort((a, b) => a._score - b._score);
-    return candidates[0];
-  }, [slots, driverCoords, riderCoord, myRides, direction, fromText, toText]);
 
   const visibleSlots = useMemo(() => {
     let list = slots.map((s) => {
@@ -419,9 +349,11 @@ export default function RiderDashboard() {
     return list;
   }, [slots, driverCoords, riderCoord, direction, fromText, toText, dayFilter, timeFilter, sexFilter, minSeats, paymentFilter, maxDistance, sortBy]);
 
-  // Start back at the first page whenever the filters/direction/sort change the result set.
+  // Start back at the first page, and clear any selected ride, whenever
+  // the filters/direction/sort change the result set out from under it.
   useEffect(() => {
     setVisibleCount(RESULTS_PAGE_SIZE);
+    setSelectedSlotId(null);
   }, [direction, fromText, toText, dayFilter, timeFilter, sexFilter, minSeats, paymentFilter, maxDistance, sortBy]);
 
   return (
@@ -449,12 +381,12 @@ export default function RiderDashboard() {
         submitLabel="Search"
       />
 
-      {suggestedSlot && <SuggestedRideCard slot={suggestedSlot} onSelect={() => setSelected(suggestedSlot)} />}
-
       <CampusMap {...mapProps} variant="compact" onExpandRequest={() => setMapExpanded(true)} />
       <MapLegend />
 
-      <div id="ride-filters" className="card-flat" style={{ marginTop: 28, marginBottom: 24 }}>
+      <h2 style={{ fontSize: 20, marginTop: 28, marginBottom: 14 }}>Choose a ride</h2>
+
+      <div id="ride-filters" className="card-flat" style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", flexWrap: "nowrap", gap: 6 }}>
           <FilterSelect label="Distance" value={maxDistance} onChange={setMaxDistance} options={DISTANCE_OPTIONS} />
           <FilterSelect
@@ -488,41 +420,12 @@ export default function RiderDashboard() {
       ) : (
         <div className="stack">
           {visibleSlots.slice(0, visibleCount).map((slot) => (
-            <div key={slot.id} className="card-flat row-between">
-              <div className="row" style={{ gap: 12, alignItems: "flex-start" }}>
-                <PersonAvatar photoUrl={slot.driver?.profile_photo_url} />
-                <div>
-                  <div className="row" style={{ gap: 8 }}>
-                    <span
-                      title={slot.seats_available > 0 ? "Available at this time" : "No open seats"}
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: "50%",
-                        background: slot.seats_available > 0 ? "#3FA66A" : "#5B6479",
-                        flexShrink: 0,
-                      }}
-                    />
-                    <div style={{ fontWeight: 700 }}>
-                      {slot.route_from} → {slot.route_to}
-                    </div>
-                  </div>
-                  <div className="muted" style={{ fontSize: 13, marginTop: 4, marginBottom: 6 }}>
-                    {slotLabel(slot)}
-                    {slot._distance != null ? ` · ${formatMiles(slot._distance)} from you` : ""}
-                  </div>
-                  <div className="row" style={{ gap: 8 }}>
-                    <StarDisplay value={slot.driver?.driver_profile?.avg_rating} />
-                    <span className="muted" style={{ fontSize: 13 }}>
-                      {slot.driver?.first_name} {slot.driver?.last_name} · {slot.seats_available} seat(s) left
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <button className="btn btn-primary btn-sm" onClick={() => setSelected(slot)}>
-                View &amp; Request
-              </button>
-            </div>
+            <RideOptionRow
+              key={slot.id}
+              slot={slot}
+              active={selectedSlotId === slot.id}
+              onClick={() => setSelectedSlotId(slot.id)}
+            />
           ))}
           {visibleCount < visibleSlots.length && (
             <button
@@ -533,6 +436,15 @@ export default function RiderDashboard() {
               Load more ({visibleSlots.length - visibleCount} more)
             </button>
           )}
+          <button
+            type="button"
+            className="btn btn-primary btn-block"
+            disabled={!selectedSlotId}
+            onClick={() => setSelected(visibleSlots.find((s) => s.id === selectedSlotId))}
+            style={{ marginTop: 4 }}
+          >
+            {selectedSlotId ? "Request ride" : "Select a ride"}
+          </button>
         </div>
       )}
 
@@ -560,6 +472,64 @@ export default function RiderDashboard() {
 
       {mapExpanded && <MapModal {...mapProps} onClose={() => setMapExpanded(false)} />}
     </div>
+  );
+}
+
+/** One selectable row in "Choose a ride" — tapping it highlights it
+ * (Uber-style), it doesn't jump straight into the request flow. That
+ * happens when the "Request ride" button below the list is pressed. */
+function RideOptionRow({ slot, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="card-flat"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        width: "100%",
+        textAlign: "left",
+        cursor: "pointer",
+        border: active ? "2px solid var(--text)" : "1px solid var(--border)",
+      }}
+    >
+      <div className="row" style={{ gap: 12, alignItems: "flex-start", minWidth: 0 }}>
+        <PersonAvatar photoUrl={slot.driver?.profile_photo_url} />
+        <div style={{ minWidth: 0 }}>
+          <div className="row" style={{ gap: 8 }}>
+            <span
+              title={slot.seats_available > 0 ? "Available at this time" : "No open seats"}
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                background: slot.seats_available > 0 ? "#3FA66A" : "#5B6479",
+                flexShrink: 0,
+              }}
+            />
+            <div style={{ fontWeight: 700 }}>
+              {slot.driver?.first_name} {slot.driver?.last_name}
+            </div>
+            <StarDisplay value={slot.driver?.driver_profile?.avg_rating} size={13} />
+          </div>
+          <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+            {slot.route_from} → {slot.route_to}
+          </div>
+          <div className="muted" style={{ fontSize: 13 }}>
+            {slotLabel(slot)}
+            {slot._distance != null ? ` · ${formatMiles(slot._distance)} away` : ""}
+          </div>
+        </div>
+      </div>
+      <div style={{ textAlign: "right", flexShrink: 0 }}>
+        <div style={{ fontWeight: 800, fontSize: 16 }}>$4+</div>
+        <div className="muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
+          {slot.seats_available} seat{slot.seats_available === 1 ? "" : "s"}
+        </div>
+      </div>
+    </button>
   );
 }
 

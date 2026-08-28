@@ -21,23 +21,18 @@ export default function Navbar() {
     >
       <div
         className="container row-between navbar-row"
-        style={{ minHeight: 68, padding: "12px 24px", flexWrap: "nowrap", overflowX: "auto" }}
+        style={{ minHeight: 60, padding: "10px 24px", flexWrap: "nowrap" }}
       >
         <Link to="/home" style={{ textDecoration: "none", flexShrink: 0 }}>
-          <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.02em", whiteSpace: "nowrap" }}>
             Carpool<span style={{ color: "var(--primary-hover)" }}>Campus</span>
           </span>
         </Link>
 
-        <nav className="row" style={{ gap: 16, flexShrink: 0, flexWrap: "nowrap" }}>
+        <nav className="row" style={{ gap: 10, flexShrink: 0, flexWrap: "nowrap" }}>
           {user ? (
             <>
-              {/* One interface, one entry point — no separate Driver/Rider
-                  links. Everyone lands on the same page; offering a ride
-                  is a button inside it, not a different destination. */}
-              <Link to="/rider" className="muted" style={{ textDecoration: "none", fontSize: 14, whiteSpace: "nowrap" }}>
-                Dashboard
-              </Link>
+              {/* Just the logo + three icons — no text links, nothing to scroll. */}
               <Link
                 to="/balance"
                 aria-label="Balances"

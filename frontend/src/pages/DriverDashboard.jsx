@@ -103,12 +103,6 @@ export default function DriverDashboard() {
 
   return (
     <div className="container" style={{ paddingTop: 36 }}>
-      <div className="row" style={{ gap: 12, marginBottom: 4 }}>
-        <span style={{ fontSize: 30 }} aria-hidden>🚗</span>
-        <h1 style={{ fontSize: 30 }}>Driver dashboard</h1>
-      </div>
-      <p className="muted" style={{ marginBottom: 16 }}>Post the route you're driving, then manage requests below.</p>
-
       <RequestsSummaryCard pending={pending} nextRide={nextRide} />
 
       <AddAvailabilityForm
