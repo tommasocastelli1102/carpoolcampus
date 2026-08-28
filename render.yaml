@@ -48,6 +48,8 @@ services:
     envVars:
       - key: VITE_API_BASE_URL
         value: https://carpoolcampus-backend.onrender.com
+      - key: VITE_GOOGLE_MAPS_API_KEY
+        sync: false # set manually in the Render dashboard — not stored here
     routes:
       # Client-side routing (React Router) — every path serves index.html
       # and the app's own router takes it from there.
