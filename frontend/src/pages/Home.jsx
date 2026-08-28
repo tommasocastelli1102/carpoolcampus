@@ -168,30 +168,20 @@ export default function Home() {
         </p>
         <div className="how-it-works-grid">
           <HowItWorksStep number={1} icon="🔍" title="Find or offer a ride">
-            Browse nearby driver routes and time slots, or — if you have a car — post your own
-            availability so riders can find you.
+            Browse nearby driver routes, or post your own availability if you have a car.
           </HowItWorksStep>
-          <HowItWorksStep number={2} icon="✋" title="Request to ride">
-            Pick a time slot that works and send a request. It's just a request until the driver
-            responds.
+          <HowItWorksStep number={2} icon="🤝" title="Request & get matched">
+            Send a request for a time slot — the driver reviews it and confirms your seat.
           </HowItWorksStep>
-          <HowItWorksStep number={3} icon="✅" title="Driver accepts">
-            The driver reviews your request and confirms the seat. Once confirmed, you can message
-            each other to sort out pickup details.
-          </HowItWorksStep>
-          <HowItWorksStep number={4} icon="🚗" title="The ride happens">
+          <HowItWorksStep number={3} icon="🚗" title="Ride together">
             Meet up and commute together, just like carpooling with a friend.
           </HowItWorksStep>
-          <HowItWorksStep number={5} icon="⭐" title="Rate & record payment">
-            Afterward, leave a quick review and log how (or whether) you paid — Venmo, Zelle, cash,
-            or something else entirely.
-          </HowItWorksStep>
-          <HowItWorksStep number={6} icon="📊" title="Your balance updates">
-            Anything you haven't marked paid shows up automatically on your{" "}
+          <HowItWorksStep number={4} icon="📊" title="Rate, pay & settle up">
+            Leave a review, log how you paid, and your{" "}
             <Link to="/balance" style={{ color: "var(--primary-hover)", fontWeight: 600 }}>
               Balances
             </Link>{" "}
-            page — a running "who owes whom" for every ride, like a mini Splitwise for your commute.
+            page updates automatically.
           </HowItWorksStep>
         </div>
       </section>
@@ -202,13 +192,13 @@ export default function Home() {
         }
         .how-it-works-grid {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
+          grid-template-columns: repeat(4, 1fr);
           gap: 20px;
         }
         @media (max-width: 900px) {
           .how-it-works-grid { grid-template-columns: 1fr 1fr !important; }
         }
-        @media (max-width: 600px) {
+        @media (max-width: 560px) {
           .how-it-works-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>

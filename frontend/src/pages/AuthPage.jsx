@@ -168,7 +168,7 @@ export default function AuthPage() {
         <div
           style={{
             marginBottom: showRoleSelector ? 26 : 0,
-            maxHeight: showRoleSelector ? 120 : 0,
+            maxHeight: showRoleSelector ? 280 : 0,
             opacity: showRoleSelector ? 1 : 0,
             overflow: "hidden",
             pointerEvents: showRoleSelector ? "auto" : "none",
@@ -177,18 +177,25 @@ export default function AuthPage() {
           aria-hidden={!showRoleSelector}
         >
           <label style={{ marginBottom: 8, display: "block" }}>Do you have a car?</label>
-          <div className="row" style={{ gap: 8 }}>
-            <RoleButton active={role === "both"} onClick={() => setRole("both")}>
-              🚗 Yes, I have a car
-            </RoleButton>
-            <RoleButton active={role === "rider"} onClick={() => setRole("rider")}>
-              🎒 No, I don't
-            </RoleButton>
+          <div className="row" style={{ gap: 10 }}>
+            <CarOptionCard
+              active={role === "both"}
+              icon="🚗"
+              title="Yes, I have a car"
+              caption="Unlocks the driver dashboard too"
+              onClick={() => setRole("both")}
+            />
+            <CarOptionCard
+              active={role === "rider"}
+              icon="🎒"
+              title="No, I don't"
+              caption="Ride along with drivers nearby"
+              onClick={() => setRole("rider")}
+            />
           </div>
           <p className="helper-text">
-            This isn't permanent — whether you drive or ride is up to you on any given trip. Having a
-            car just unlocks the driver dashboard too, and you can turn it on later from your profile
-            if that changes.
+            This isn't permanent — whether you drive or ride is up to you on any given trip. You can
+            turn driving on later from your profile if that changes.
           </p>
         </div>
         {/* --- End fixed header --- */}
@@ -394,20 +401,26 @@ function TabButton({ active, onClick, children }) {
   );
 }
 
-function RoleButton({ active, onClick, children }) {
+function CarOptionCard({ active, icon, title, caption, onClick }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="btn btn-sm"
+      className="card"
       style={{
         flex: 1,
-        background: active ? "rgba(45,108,246,0.16)" : "transparent",
-        color: active ? "var(--primary-hover)" : "var(--text-muted)",
-        border: active ? "1px solid var(--primary)" : "1px solid var(--border)",
+        textAlign: "left",
+        cursor: "pointer",
+        padding: "14px 16px",
+        background: active ? "rgba(45,108,246,0.12)" : "var(--surface)",
+        border: active ? "1.5px solid var(--primary)" : "1px solid var(--border)",
       }}
     >
-      {children}
+      <div style={{ fontSize: 22, marginBottom: 6 }}>{icon}</div>
+      <div style={{ fontWeight: 700, fontSize: 14, color: active ? "var(--primary-hover)" : "var(--text)" }}>
+        {title}
+      </div>
+      <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{caption}</div>
     </button>
   );
 }
