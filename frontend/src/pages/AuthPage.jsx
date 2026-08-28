@@ -182,14 +182,12 @@ export default function AuthPage() {
               active={role === "both"}
               icon="🚗"
               title="Yes, I have a car"
-              caption="Unlocks the driver dashboard too"
               onClick={() => setRole("both")}
             />
             <CarOptionCard
               active={role === "rider"}
               icon="🎒"
               title="No, I don't"
-              caption="Ride along with drivers nearby"
               onClick={() => setRole("rider")}
             />
           </div>
@@ -397,7 +395,7 @@ function TabButton({ active, onClick, children }) {
   );
 }
 
-function CarOptionCard({ active, icon, title, caption, onClick }) {
+function CarOptionCard({ active, icon, title, onClick }) {
   return (
     <button
       type="button"
@@ -416,7 +414,6 @@ function CarOptionCard({ active, icon, title, caption, onClick }) {
       <div style={{ fontWeight: 700, fontSize: 14, color: active ? "var(--primary-hover)" : "var(--text)" }}>
         {title}
       </div>
-      <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{caption}</div>
     </button>
   );
 }
