@@ -18,7 +18,6 @@ export default function ReviewPage() {
 
   const [stars, setStars] = useState({ drive_safety: 0, clean_car: 0, punctuality: 0, good_company: 0 });
   const [feedback, setFeedback] = useState("");
-  const [audioFile, setAudioFile] = useState(null);
   const [paid, setPaid] = useState("yes");
   const [paidMethod, setPaidMethod] = useState("venmo");
 
@@ -50,8 +49,6 @@ export default function ReviewPage() {
         stars_punctuality: stars.punctuality || null,
         stars_good_company: stars.good_company || null,
         free_text_feedback: feedback || null,
-        // MVP stub: we don't actually upload/transcribe audio, just note a file was attached.
-        audio_url: audioFile ? `local-upload:${audioFile.name}` : null,
         paid: paid === "yes",
         paid_method: paid === "yes" ? paidMethod : null,
       });
@@ -122,12 +119,6 @@ export default function ReviewPage() {
         <div className="field">
           <label>Other feedback</label>
           <textarea rows={3} value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="Anything else worth sharing?" />
-        </div>
-
-        <div className="field">
-          <label>Or attach a voice note (optional)</label>
-          <input type="file" accept="audio/*" onChange={(e) => setAudioFile(e.target.files?.[0] || null)} />
-          <p className="helper-text">Demo only — not transcribed or processed.</p>
         </div>
 
         <div className="field">
