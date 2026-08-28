@@ -61,6 +61,9 @@ export default function DriverDashboard() {
     (a, b) => requestSortKey(a) - requestSortKey(b)
   );
   const others = requests.filter((r) => r.status !== "pending");
+  const nextRide = [...requests.filter((r) => r.status === "confirmed")].sort(
+    (a, b) => requestSortKey(a) - requestSortKey(b)
+  )[0];
 
   const act = async (id, status) => {
     await client.patch(`/rides/request/${id}`, { status });
@@ -106,6 +109,8 @@ export default function DriverDashboard() {
       </div>
       <p className="muted" style={{ marginBottom: 16 }}>Post the route you're driving, then manage requests below.</p>
 
+      <RequestsSummaryCard pending={pending} nextRide={nextRide} />
+
       <AddAvailabilityForm
         user={user}
         onSaved={load}
@@ -115,7 +120,7 @@ export default function DriverDashboard() {
       <CampusMap {...mapProps} variant="compact" onExpandRequest={() => setMapExpanded(true)} />
       <MapLegend />
 
-      <h2 style={{ fontSize: 22, marginTop: 32, marginBottom: 16 }}>Incoming requests</h2>
+      <h2 id="incoming-requests" style={{ fontSize: 22, marginTop: 32, marginBottom: 16 }}>Incoming requests</h2>
       {loading ? (
         <div className="spinner" />
       ) : pending.length === 0 ? (
@@ -214,6 +219,60 @@ export default function DriverDashboard() {
       )}
 
       {mapExpanded && <MapModal {...mapProps} onClose={() => setMapExpanded(false)} />}
+    </div>
+  );
+}
+
+/** The first thing a driver sees: how many requests are waiting on them,
+ * and what/who their next confirmed ride actually is — an at-a-glance
+ * summary before the route-posting form and the full request list. */
+function RequestsSummaryCard({ pending, nextRide }) {
+  return (
+    <div className="card" style={{ marginBottom: 20 }}>
+      <div className="row-between" style={{ marginBottom: 14 }}>
+        <div>
+          <div className="muted" style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
+            Requests
+          </div>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>
+            {pending.length} pending {pending.length === 1 ? "request" : "requests"}
+          </div>
+        </div>
+        {pending.length > 0 && (
+          <a href="#incoming-requests" className="btn btn-primary btn-sm" style={{ textDecoration: "none" }}>
+            Review
+          </a>
+        )}
+      </div>
+
+      <div className="card-flat">
+        <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+          Next ride booked
+        </div>
+        {nextRide ? (
+          <>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>
+              {nextRide.rider?.first_name} {nextRide.rider?.last_name}
+            </div>
+            <div className="muted" style={{ fontSize: 13 }}>
+              {nextRide.custom_time
+                ? new Date(nextRide.custom_time).toLocaleString()
+                : nextRide.availability
+                ? `${DAYS[nextRide.availability.day_of_week]}s · ${nextRide.availability.start_time.slice(0, 5)}–${nextRide.availability.end_time.slice(0, 5)}`
+                : "Time TBD"}
+              {" · "}
+              {nextRide.pickup_type === "pickup" ? "Pickup" : "Meet outside their place"}
+              {nextRide.custom_place
+                ? ` at ${nextRide.custom_place}`
+                : nextRide.availability
+                ? ` near ${nextRide.availability.route_from}`
+                : ""}
+            </div>
+          </>
+        ) : (
+          <span className="muted" style={{ fontSize: 13 }}>No rides booked yet.</span>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import client, { apiErrorMessage } from "../api/client";
 import { geocodeAddress, geocodeMany } from "../api/geocode";
 import { haversineMiles, formatMiles } from "../lib/geo";
@@ -8,7 +8,6 @@ import { StarDisplay } from "../components/StarRating";
 import CampusMap, { MapLegend } from "../components/CampusMap";
 import MapModal from "../components/MapModal";
 import RouteSearchBar from "../components/RouteSearchBar";
-import AddAvailabilityForm from "../components/AddAvailabilityForm";
 import { addressForUniversity } from "../lib/universities";
 import { isCampusText, CAMPUS_SEARCH_TEXT } from "../lib/campus";
 import { CarIcon } from "../components/Icons";
@@ -150,6 +149,7 @@ function SuggestedRideCard({ slot, onSelect }) {
 
 export default function RiderDashboard() {
   const { user, setUser } = useAuth();
+  const navigate = useNavigate();
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -161,7 +161,6 @@ export default function RiderDashboard() {
   const [mapExpanded, setMapExpanded] = useState(false);
   const [riderCoord, setRiderCoord] = useState(null);
   const [driverCoords, setDriverCoords] = useState(new Map());
-  const [showAddAvailability, setShowAddAvailability] = useState(false);
   const [enablingDriving, setEnablingDriving] = useState(false);
 
   // Which way are you headed? Derived straight from the From/To text —
@@ -236,7 +235,10 @@ export default function RiderDashboard() {
 
   // Riders who don't have a car on file yet get flipped to role "both"
   // on the fly — having a car isn't a permanent choice, so there's no
-  // reason to make someone leave this page to unlock posting a route.
+  // reason to make someone register separately to post a route. Once
+  // that's settled, this hands off to the driver interface — a full
+  // page, not a modal, since there's real content to manage there
+  // (incoming requests, posted routes), not just a quick form.
   const handleAddAvailabilityClick = async () => {
     if (user.role === "rider") {
       setEnablingDriving(true);
@@ -244,13 +246,13 @@ export default function RiderDashboard() {
         const { data } = await client.post("/auth/enable-driving", {});
         setUser(data);
       } catch {
-        // Non-fatal — the form below still lets them try; worst case the
-        // post fails and they see that error instead.
+        // Non-fatal — /driver still works even if this failed; worst
+        // case posting a route there fails and they see that error.
       } finally {
         setEnablingDriving(false);
       }
     }
-    setShowAddAvailability(true);
+    navigate("/driver");
   };
 
   // Geocode "my apartment" once, and every distinct driver address in the
@@ -549,28 +551,6 @@ export default function RiderDashboard() {
       )}
 
       {mapExpanded && <MapModal {...mapProps} onClose={() => setMapExpanded(false)} />}
-
-      {showAddAvailability && (
-        <div className="modal-backdrop" onClick={() => setShowAddAvailability(false)}>
-          <div className="modal" style={{ maxWidth: 560, textAlign: "left" }} onClick={(e) => e.stopPropagation()}>
-            <div className="row-between" style={{ marginBottom: 16 }}>
-              <h3>Add availability</h3>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                style={{ width: "auto", padding: "4px 10px" }}
-                onClick={() => setShowAddAvailability(false)}
-              >
-                ✕
-              </button>
-            </div>
-            <AddAvailabilityForm
-              user={user}
-              onSaved={() => setShowAddAvailability(false)}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

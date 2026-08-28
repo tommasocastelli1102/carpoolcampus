@@ -32,16 +32,12 @@ export default function Navbar() {
         <nav className="row" style={{ gap: 16, flexShrink: 0, flexWrap: "nowrap" }}>
           {user ? (
             <>
-              {(user.role === "driver" || user.role === "both") && (
-                <Link to="/driver" className="muted" style={{ textDecoration: "none", fontSize: 14, whiteSpace: "nowrap" }}>
-                  🚗 Driver
-                </Link>
-              )}
-              {(user.role === "rider" || user.role === "both") && (
-                <Link to="/rider" className="muted" style={{ textDecoration: "none", fontSize: 14, whiteSpace: "nowrap" }}>
-                  🎒 Rider
-                </Link>
-              )}
+              {/* One interface, one entry point — no separate Driver/Rider
+                  links. Everyone lands on the same page; offering a ride
+                  is a button inside it, not a different destination. */}
+              <Link to="/rider" className="muted" style={{ textDecoration: "none", fontSize: 14, whiteSpace: "nowrap" }}>
+                Dashboard
+              </Link>
               <Link
                 to="/balance"
                 aria-label="Balances"
