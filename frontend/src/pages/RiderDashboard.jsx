@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { StarDisplay } from "../components/StarRating";
 import CampusMap, { MapLegend } from "../components/CampusMap";
 import MapModal from "../components/MapModal";
+import CollapsibleSection from "../components/CollapsibleSection";
 import RouteSearchBar from "../components/RouteSearchBar";
 import AddAvailabilityForm from "../components/AddAvailabilityForm";
 import ComingSoonModal from "../components/ComingSoonModal";
@@ -170,6 +171,7 @@ export default function RiderDashboard() {
   const [editRequest, setEditRequest] = useState(null);
   const [showAddAvailability, setShowAddAvailability] = useState(false);
   const [showLaterModal, setShowLaterModal] = useState(false);
+  const [incomingOpen, setIncomingOpen] = useState(false); // controlled: the "Requests" button forces this open
 
   const loadDriverData = async () => {
     setDriverLoading(true);
@@ -446,7 +448,11 @@ export default function RiderDashboard() {
     <div className="container" style={{ paddingTop: 36 }}>
       {todaysRide && <TodaysRideCard ride={todaysRide} />}
 
-      <RequestsButton pendingCount={pendingDriverRequests.length} acceptedCount={acceptedDriverCount} />
+      <RequestsButton
+        pendingCount={pendingDriverRequests.length}
+        acceptedCount={acceptedDriverCount}
+        onExpand={() => setIncomingOpen(true)}
+      />
 
       {hasCar && (
         <>
@@ -481,9 +487,7 @@ export default function RiderDashboard() {
       <CampusMap {...mapProps} variant="compact" onExpandRequest={() => setMapExpanded(true)} />
       <MapLegend />
 
-      <div className="card" style={{ marginTop: 28, marginBottom: 20 }}>
-        <h2 style={{ fontSize: 20, marginBottom: 14 }}>Choose a ride</h2>
-
+      <CollapsibleSection title="Choose a ride" style={{ marginTop: 28 }}>
         {loading ? (
           <div className="spinner" />
         ) : visibleSlots.length === 0 ? (
@@ -524,10 +528,14 @@ export default function RiderDashboard() {
             )}
           </div>
         )}
-      </div>
+      </CollapsibleSection>
 
-      <div className="card" style={{ marginBottom: 20 }}>
-        <h2 id="incoming-requests" style={{ fontSize: 20, marginBottom: 14 }}>Incoming requests</h2>
+      <CollapsibleSection
+        title="Incoming requests"
+        id="incoming-requests"
+        open={incomingOpen}
+        onOpenChange={setIncomingOpen}
+      >
             {driverLoading ? (
               <div className="spinner" />
             ) : pendingDriverRequests.length === 0 ? (
@@ -607,11 +615,10 @@ export default function RiderDashboard() {
                 onClose={() => setEditRequest(null)}
               />
             )}
-          </div>
+      </CollapsibleSection>
 
       {hasCar && (
-        <div className="card" style={{ marginBottom: 20 }}>
-          <h2 style={{ fontSize: 20, marginBottom: 14 }}>My availability</h2>
+        <CollapsibleSection title="My availability">
           {driverSlots.length === 0 ? (
             <p className="muted">You haven't posted any availability yet.</p>
           ) : (
@@ -627,11 +634,10 @@ export default function RiderDashboard() {
               ))}
             </div>
           )}
-        </div>
+        </CollapsibleSection>
       )}
 
-      <div className="card" style={{ marginTop: 28, marginBottom: 20 }}>
-        <h2 style={{ fontSize: 20, marginBottom: 14 }}>My last rides</h2>
+      <CollapsibleSection title="My last rides" style={{ marginTop: 28 }}>
         {myRides.length === 0 ? (
           <p className="muted">You haven't requested any rides yet.</p>
         ) : (
@@ -641,7 +647,7 @@ export default function RiderDashboard() {
             ))}
           </div>
         )}
-      </div>
+      </CollapsibleSection>
 
       {selected && (
         <RouteDetailModal
@@ -776,11 +782,12 @@ function RideOptionRow({ slot, isNext, active, onClick }) {
 /** Full-width button, same shape as "+ Add availability" right below
  * it — jumps to the incoming-requests list, with pending/accepted counts
  * as colored tags so the numbers are visible without opening it. */
-function RequestsButton({ pendingCount, acceptedCount }) {
+function RequestsButton({ pendingCount, acceptedCount, onExpand }) {
   return (
     <a
       href="#incoming-requests"
       className="btn btn-primary btn-block"
+      onClick={onExpand}
       style={{
         display: "flex",
         alignItems: "center",
