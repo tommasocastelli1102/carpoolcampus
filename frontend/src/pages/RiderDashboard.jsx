@@ -145,7 +145,7 @@ function PersonAvatar({ size = 40 }) {
 
 
 export default function RiderDashboard() {
-  const { user, setUser } = useAuth();
+  const { user } = useAuth();
   const hasCar = user.role !== "rider";
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -160,12 +160,10 @@ export default function RiderDashboard() {
   const [riderCoord, setRiderCoord] = useState(null); // geocoded from the profile address, the fallback origin
   const [originCoord, setOriginCoord] = useState(null); // geocoded from the typed starting point, when there is one
   const [driverCoords, setDriverCoords] = useState(new Map());
-  const [enablingDriving, setEnablingDriving] = useState(false);
   const [searchRadius, setSearchRadiusState] = useState(getSearchRadius());
 
-  // Driver-side state — only meaningful (and only fetched) once the
-  // account has a car. Same page for everyone; this is just the part
-  // that's conditional on that.
+  // Requests (both placed and received) apply to everyone regardless of
+  // car ownership — only *posting* availability is car-owners-only.
   const [driverRequests, setDriverRequests] = useState([]);
   const [driverSlots, setDriverSlots] = useState([]);
   const [driverLoading, setDriverLoading] = useState(true);
@@ -188,9 +186,9 @@ export default function RiderDashboard() {
   };
 
   useEffect(() => {
-    if (hasCar) loadDriverData();
+    loadDriverData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasCar]);
+  }, []);
 
   const pendingDriverRequests = [...driverRequests.filter((r) => r.status === "pending")].sort(
     (a, b) => requestSortKey(a) - requestSortKey(b)
@@ -263,24 +261,10 @@ export default function RiderDashboard() {
     loadSlots(merged);
   };
 
-  // Riders who don't have a car on file yet get flipped to role "both"
-  // on the fly — having a car isn't a permanent choice, so there's no
-  // reason to make someone register separately to post a route. Either
-  // way this just reveals the posting form in place — it stays hidden
-  // until asked for, rather than always taking up space on the page.
-  const handleAddAvailabilityClick = async () => {
-    if (user.role === "rider") {
-      setEnablingDriving(true);
-      try {
-        const { data } = await client.post("/auth/enable-driving", {});
-        setUser(data);
-      } catch {
-        // Non-fatal — the form below still lets them try; worst case
-        // posting a route fails and they see that error instead.
-      } finally {
-        setEnablingDriving(false);
-      }
-    }
+  // Only shown to accounts that already have a car (see render below) —
+  // becoming a driver at all happens from the profile menu, not here.
+  // This just reveals the posting form in place, hidden until asked for.
+  const handleAddAvailabilityClick = () => {
     setShowAddAvailability((v) => !v);
   };
 
@@ -461,21 +445,22 @@ export default function RiderDashboard() {
     <div className="container" style={{ paddingTop: 36 }}>
       {todaysRide && <TodaysRideCard ride={todaysRide} />}
 
+      <RequestsButton pendingCount={pendingDriverRequests.length} acceptedCount={acceptedDriverCount} />
+
       {hasCar && (
-        <RequestsButton pendingCount={pendingDriverRequests.length} acceptedCount={acceptedDriverCount} />
-      )}
+        <>
+          <button
+            className="btn btn-primary btn-block"
+            onClick={handleAddAvailabilityClick}
+            style={{ marginBottom: 20 }}
+          >
+            {showAddAvailability ? "✕ Close" : "+ Add availability"}
+          </button>
 
-      <button
-        className="btn btn-primary btn-block"
-        onClick={handleAddAvailabilityClick}
-        disabled={enablingDriving}
-        style={{ marginBottom: 20 }}
-      >
-        {enablingDriving ? "One sec…" : showAddAvailability ? "✕ Close" : "+ Add availability"}
-      </button>
-
-      {showAddAvailability && (
-        <AddAvailabilityForm user={user} onSaved={() => { setShowAddAvailability(false); loadDriverData(); }} />
+          {showAddAvailability && (
+            <AddAvailabilityForm user={user} onSaved={() => { setShowAddAvailability(false); loadDriverData(); }} />
+          )}
+        </>
       )}
 
       <h2 style={{ fontSize: 20, marginTop: 8, marginBottom: 14 }}>Find a ride</h2>
@@ -540,10 +525,8 @@ export default function RiderDashboard() {
         )}
       </div>
 
-      {hasCar && (
-        <>
-          <div className="card" style={{ marginBottom: 20 }}>
-            <h2 id="incoming-requests" style={{ fontSize: 20, marginBottom: 14 }}>Incoming requests</h2>
+      <div className="card" style={{ marginBottom: 20 }}>
+        <h2 id="incoming-requests" style={{ fontSize: 20, marginBottom: 14 }}>Incoming requests</h2>
             {driverLoading ? (
               <div className="spinner" />
             ) : pendingDriverRequests.length === 0 ? (
@@ -625,25 +608,25 @@ export default function RiderDashboard() {
             )}
           </div>
 
-          <div className="card" style={{ marginBottom: 20 }}>
-            <h2 style={{ fontSize: 20, marginBottom: 14 }}>My availability</h2>
-            {driverSlots.length === 0 ? (
-              <p className="muted">You haven't posted any availability yet.</p>
-            ) : (
-              <div className="stack">
-                {driverSlots.map((s) => (
-                  <div key={s.id} className="card-flat">
-                    <div style={{ fontWeight: 700, marginBottom: 4 }}>{s.route_from} → {s.route_to}</div>
-                    <div className="muted" style={{ fontSize: 13 }}>
-                      {s.date ? s.date : s.day_of_week != null ? `${DAYS_FULL[s.day_of_week]}s` : "One-off"} ·{" "}
-                      {s.start_time.slice(0, 5)}–{s.end_time.slice(0, 5)} · {s.seats_available} seat(s)
-                    </div>
+      {hasCar && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <h2 style={{ fontSize: 20, marginBottom: 14 }}>My availability</h2>
+          {driverSlots.length === 0 ? (
+            <p className="muted">You haven't posted any availability yet.</p>
+          ) : (
+            <div className="stack">
+              {driverSlots.map((s) => (
+                <div key={s.id} className="card-flat">
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>{s.route_from} → {s.route_to}</div>
+                  <div className="muted" style={{ fontSize: 13 }}>
+                    {s.date ? s.date : s.day_of_week != null ? `${DAYS_FULL[s.day_of_week]}s` : "One-off"} ·{" "}
+                    {s.start_time.slice(0, 5)}–{s.end_time.slice(0, 5)} · {s.seats_available} seat(s)
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       <div className="card" style={{ marginTop: 28, marginBottom: 20 }}>
