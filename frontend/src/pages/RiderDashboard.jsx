@@ -14,6 +14,7 @@ import { addressForUniversity } from "../lib/universities";
 import { isCampusText, CAMPUS_SEARCH_TEXT } from "../lib/campus";
 import { CarIcon } from "../components/Icons";
 import { PAYMENT_LABELS } from "../lib/paymentMethods";
+import { getSearchRadius, onSearchRadiusChange } from "../lib/searchRadius";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DAYS_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -156,9 +157,11 @@ export default function RiderDashboard() {
   const [drivers, setDrivers] = useState([]);
   const [bookedStops, setBookedStops] = useState([]); // addresses of other riders already confirmed on "my" driver's route
   const [mapExpanded, setMapExpanded] = useState(false);
-  const [riderCoord, setRiderCoord] = useState(null);
+  const [riderCoord, setRiderCoord] = useState(null); // geocoded from the profile address, the fallback origin
+  const [originCoord, setOriginCoord] = useState(null); // geocoded from the typed starting point, when there is one
   const [driverCoords, setDriverCoords] = useState(new Map());
   const [enablingDriving, setEnablingDriving] = useState(false);
+  const [searchRadius, setSearchRadiusState] = useState(getSearchRadius());
 
   // Driver-side state — only meaningful (and only fetched) once the
   // account has a car. Same page for everyone; this is just the part
@@ -288,6 +291,29 @@ export default function RiderDashboard() {
     geocodeAddress(user.address).then(setRiderCoord);
   }, [user.address]);
 
+  // Also geocode whatever's actually typed as the starting point, so
+  // "Choose a ride" can search around that instead of always defaulting
+  // to the home address — this is what the mile radius below is measured
+  // from once it's set.
+  useEffect(() => {
+    const from = fromText.trim();
+    if (!from) {
+      setOriginCoord(null);
+      return;
+    }
+    let cancelled = false;
+    geocodeAddress(from).then((coord) => {
+      if (!cancelled) setOriginCoord(coord);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fromText]);
+
+  // Pick up range changes made from the profile menu while this page is
+  // already open.
+  useEffect(() => onSearchRadiusChange(() => setSearchRadiusState(getSearchRadius())), []);
+
   useEffect(() => {
     const addresses = slots.map((s) => s.driver?.address).filter(Boolean);
     geocodeMany(addresses).then(setDriverCoords);
@@ -378,10 +404,14 @@ export default function RiderDashboard() {
     emptyHint: "Add your home address (see your profile) to see the map.",
   };
 
+  // The starting point you typed, if it geocoded — otherwise your profile
+  // address is the fallback origin "Choose a ride" measures distance from.
+  const origin = originCoord || riderCoord;
+
   const visibleSlots = useMemo(() => {
     let list = slots.map((s) => {
       const coord = s.driver?.address ? driverCoords.get(s.driver.address) : null;
-      const distance = riderCoord && coord ? haversineMiles(riderCoord, coord) : null;
+      const distance = origin && coord ? haversineMiles(origin, coord) : null;
       return { ...s, _distance: distance };
     });
 
@@ -400,6 +430,12 @@ export default function RiderDashboard() {
     if (dayFilter !== "") list = list.filter((s) => String(s.day_of_week) === dayFilter);
     if (timeFilter) list = list.filter((s) => timeBucket(s.start_time) === timeFilter);
 
+    // Only rides within the configured range of the starting point —
+    // slots whose distance couldn't be computed (address didn't geocode)
+    // are kept rather than hidden, so a geocoding gap never silently
+    // drops a real result.
+    if (origin) list = list.filter((s) => s._distance == null || s._distance <= searchRadius);
+
     // Soonest next occurrence first — the top of "Choose a ride" is
     // always the next ride you could actually catch, not just the
     // closest one. Distance breaks ties.
@@ -407,7 +443,7 @@ export default function RiderDashboard() {
     list = list.map((s) => ({ ...s, _minutesUntil: minutesUntilNext(s, now) }));
     list.sort((a, b) => a._minutesUntil - b._minutesUntil || (a._distance ?? Infinity) - (b._distance ?? Infinity));
     return list;
-  }, [slots, driverCoords, riderCoord, direction, fromText, toText, dayFilter, timeFilter]);
+  }, [slots, driverCoords, origin, direction, fromText, toText, dayFilter, timeFilter, searchRadius]);
 
   // The soonest ride that actually has an open seat — badged in the list
   // below, separately from just "first in the sorted list" (which could
@@ -415,11 +451,11 @@ export default function RiderDashboard() {
   const nextAvailableSlot = visibleSlots.find((s) => s.seats_available > 0);
 
   // Start back at the first page, and clear any selected ride, whenever
-  // the filters/direction change the result set out from under it.
+  // the filters/direction/range change the result set out from under it.
   useEffect(() => {
     setVisibleCount(RESULTS_PAGE_SIZE);
     setSelectedSlotId(null);
-  }, [direction, fromText, toText, dayFilter, timeFilter]);
+  }, [direction, fromText, toText, dayFilter, timeFilter, searchRadius]);
 
   return (
     <div className="container" style={{ paddingTop: 36 }}>
@@ -465,7 +501,11 @@ export default function RiderDashboard() {
         {loading ? (
           <div className="spinner" />
         ) : visibleSlots.length === 0 ? (
-          <p className="muted">No driver routes match yet — try clearing some filters.</p>
+          <p className="muted">
+            {origin
+              ? `No driver routes within ${searchRadius} mi of your starting point — try a wider range (profile menu) or a different starting point.`
+              : "No driver routes match yet — try clearing some filters."}
+          </p>
         ) : (
           <div className="stack">
             {visibleSlots.slice(0, visibleCount).map((slot) => (

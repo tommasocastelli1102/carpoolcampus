@@ -7,6 +7,7 @@ import { haversineMiles, milesToKm, co2SavedKg } from "../lib/geo";
 import { useAuth } from "../context/AuthContext";
 import { UserIcon } from "./Icons";
 import { StarDisplay } from "./StarRating";
+import { getSearchRadius, setSearchRadius, SEARCH_RADIUS_OPTIONS } from "../lib/searchRadius";
 
 const REVIEW_STAR_KEYS = ["stars_drive_safety", "stars_clean_car", "stars_punctuality", "stars_good_company"];
 
@@ -36,6 +37,7 @@ export default function ProfileMenu() {
   const [stats, setStats] = useState(null); // { kmTravelled, co2Kg, rating, reviewCount }
   const [enablingDriving, setEnablingDriving] = useState(false);
   const [enableError, setEnableError] = useState("");
+  const [radius, setRadius] = useState(getSearchRadius());
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
 
@@ -119,6 +121,12 @@ export default function ProfileMenu() {
     setOpen(false);
     logout();
     navigate("/home");
+  };
+
+  const handleRadiusChange = (e) => {
+    const miles = Number(e.target.value);
+    setRadius(miles);
+    setSearchRadius(miles);
   };
 
   const handleEnableDriving = async () => {
@@ -230,6 +238,24 @@ export default function ProfileMenu() {
               </div>
             </div>
 
+            <div style={{ padding: "0 18px 14px", borderTop: "1px solid var(--border)", paddingTop: 14 }}>
+              <div className="row-between" style={{ alignItems: "center" }}>
+                <label style={{ fontSize: 13, marginBottom: 0 }}>Search range</label>
+                <select
+                  value={radius}
+                  onChange={handleRadiusChange}
+                  style={{ width: "auto", padding: "6px 10px", fontSize: 13 }}
+                >
+                  {SEARCH_RADIUS_OPTIONS.map((mi) => (
+                    <option key={mi} value={mi}>{mi} mi</option>
+                  ))}
+                </select>
+              </div>
+              <p className="helper-text" style={{ marginBottom: 0 }}>
+                How far from your starting point "Choose a ride" looks for rides.
+              </p>
+            </div>
+
             {user.role === "rider" && (
               <div style={{ padding: "0 18px 14px", borderTop: "1px solid var(--border)", paddingTop: 14 }}>
                 <button
@@ -258,7 +284,7 @@ export default function ProfileMenu() {
                 padding: "12px 18px",
                 background: "transparent",
                 border: "none",
-                borderTop: user.role === "rider" ? "none" : "1px solid var(--border)",
+                borderTop: "1px solid var(--border)",
                 cursor: "pointer",
                 color: "var(--danger)",
                 fontSize: 13,
