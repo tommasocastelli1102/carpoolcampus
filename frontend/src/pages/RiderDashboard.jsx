@@ -143,6 +143,7 @@ export default function RiderDashboard() {
   const [driverLoading, setDriverLoading] = useState(true);
   const [editRequest, setEditRequest] = useState(null);
   const [showAddAvailability, setShowAddAvailability] = useState(false);
+  const [showLaterModal, setShowLaterModal] = useState(false);
 
   const loadDriverData = async () => {
     setDriverLoading(true);
@@ -234,23 +235,11 @@ export default function RiderDashboard() {
     loadSlots();
   };
 
-  const handleCampusClick = () => {
-    setFromText("");
-    setToText(CAMPUS_SEARCH_TEXT);
-    loadSlots({ from: "", to: CAMPUS_SEARCH_TEXT });
-  };
-
-  const handleHomeClick = () => {
-    setFromText(CAMPUS_SEARCH_TEXT);
-    setToText("");
-    loadSlots({ from: CAMPUS_SEARCH_TEXT, to: "" });
-  };
-
-  // "Later" — rides aren't a live now/not-now feed, just recurring day +
-  // time slots, so browsing for later means the Day/Time filters below.
-  // Jump there instead of duplicating that picker inline.
-  const handleLaterClick = () => {
-    document.getElementById("ride-filters")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  // Home/Campus fill whichever field was last focused (From or To) —
+  // RouteSearchBar already updated that field's text; this just re-runs
+  // the search with the new From/To together.
+  const handleFieldFilled = (field, value, merged) => {
+    loadSlots(merged);
   };
 
   // Riders who don't have a car on file yet get flipped to role "both"
@@ -411,16 +400,11 @@ export default function RiderDashboard() {
 
   return (
     <div className="container" style={{ paddingTop: 36 }}>
-      <div className="row-between" style={{ marginBottom: 4 }}>
-        <div className="row" style={{ gap: 12 }}>
-          <span style={{ fontSize: 30 }} aria-hidden>🎒</span>
-          <h1 style={{ fontSize: 30 }}>Rider dashboard</h1>
-        </div>
+      <div className="row" style={{ justifyContent: "flex-end", marginBottom: 16 }}>
         <button className="btn btn-primary btn-sm" onClick={handleAddAvailabilityClick} disabled={enablingDriving}>
           {enablingDriving ? "One sec…" : showAddAvailability ? "✕ Close" : "+ Add availability"}
         </button>
       </div>
-      <p className="muted" style={{ marginBottom: 16 }}>Browse driver routes and time slots headed your way.</p>
 
       {hasCar && <RequestsSummaryCard pending={pendingDriverRequests} nextRide={nextRide} />}
 
@@ -537,9 +521,9 @@ export default function RiderDashboard() {
         to={toText}
         onFromChange={setFromText}
         onToChange={setToText}
-        onCampus={handleCampusClick}
-        onHome={handleHomeClick}
-        onLater={handleLaterClick}
+        homeValue={user.address || "Home"}
+        onFilled={handleFieldFilled}
+        onLater={() => setShowLaterModal(true)}
         onSubmit={handleSearch}
         submitLabel="Search"
       />
@@ -634,6 +618,53 @@ export default function RiderDashboard() {
       )}
 
       {mapExpanded && <MapModal {...mapProps} onClose={() => setMapExpanded(false)} />}
+
+      {showLaterModal && (
+        <div className="modal-backdrop" onClick={() => setShowLaterModal(false)}>
+          <div className="modal" style={{ maxWidth: 380, textAlign: "left" }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ marginBottom: 18 }}>Pick a day &amp; time</h3>
+            <div className="field">
+              <label>Day</label>
+              <select value={dayFilter} onChange={(e) => setDayFilter(e.target.value)}>
+                <option value="">Any day</option>
+                {DAYS.map((d, i) => (
+                  <option key={d} value={i}>{d}</option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label>Time</label>
+              <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value)}>
+                <option value="">Any time</option>
+                {TIME_OPTIONS.filter((o) => o.value).map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="row" style={{ gap: 10, marginTop: 6 }}>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{ flex: 1 }}
+                onClick={() => {
+                  setDayFilter("");
+                  setTimeFilter("");
+                }}
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ flex: 1 }}
+                onClick={() => setShowLaterModal(false)}
+              >
+                Show rides
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

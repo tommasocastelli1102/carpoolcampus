@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import client, { apiErrorMessage } from "../api/client";
 import { CAMPUS_SEARCH_TEXT } from "../lib/campus";
 import RouteSearchBar from "./RouteSearchBar";
@@ -9,7 +9,7 @@ const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
  * search, just posting a route instead. Shared by the driver dashboard
  * (embedded inline) and the rider dashboard (inside a modal, for anyone
  * who wants to offer a ride without leaving the rider view). */
-export default function AddAvailabilityForm({ user, onSaved, submitLabel = "Post route", onFieldsChange }) {
+export default function AddAvailabilityForm({ user, onSaved, submitLabel = "Post route" }) {
   const [fromText, setFromText] = useState(user.address || "");
   const [toText, setToText] = useState(CAMPUS_SEARCH_TEXT);
   const [dayOfWeek, setDayOfWeek] = useState("0");
@@ -18,23 +18,6 @@ export default function AddAvailabilityForm({ user, onSaved, submitLabel = "Post
   const [seats, setSeats] = useState(3);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
-  // Lets a parent dashboard (e.g. for orienting its map) know what's
-  // currently typed, without lifting the whole form's state up to it.
-  useEffect(() => {
-    onFieldsChange?.(fromText, toText);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromText, toText]);
-
-  const handleCampusClick = () => {
-    setFromText(user.address || "Home");
-    setToText(CAMPUS_SEARCH_TEXT);
-  };
-
-  const handleHomeClick = () => {
-    setFromText(CAMPUS_SEARCH_TEXT);
-    setToText(user.address || "Home");
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -69,8 +52,7 @@ export default function AddAvailabilityForm({ user, onSaved, submitLabel = "Post
       to={toText}
       onFromChange={setFromText}
       onToChange={setToText}
-      onCampus={handleCampusClick}
-      onHome={handleHomeClick}
+      homeValue={user.address || "Home"}
       onSubmit={handleSubmit}
       submitLabel={submitting ? "Posting…" : submitLabel}
     >

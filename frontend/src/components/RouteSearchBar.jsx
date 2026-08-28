@@ -1,23 +1,28 @@
-import { isCampusText, CAMPUS_SEARCH_TEXT } from "../lib/campus";
+import { useState } from "react";
+import { CAMPUS_SEARCH_TEXT } from "../lib/campus";
 
 /** The one shared "Uber-style" interaction surface for both dashboards: a
  * From/To field pair styled like a maps directions picker (hollow origin
  * dot, dotted connector, destination pin), plus one-tap shortcuts below
- * it for the two routes everyone actually takes — home and campus — so
- * there's no need for a separate "other destination" input. Typing
- * anything else directly into From/To already covers every other case.
+ * it for the two places everyone actually goes — home and campus.
+ *
+ * Home/Campus aren't tied to a fixed field: whichever field you tapped
+ * into last (From or To — To by default) is the one that gets filled,
+ * so picking one doesn't clear or override the other.
  *
  * Riders search existing routes with this; drivers use the identical bar
- * to describe the route they're offering. `submitLabel` and the
- * placeholders are the only things that differ between the two.
+ * to describe the route they're offering. `submitLabel`, the
+ * placeholders, and `homeValue` are the only things that differ between
+ * the two.
  */
 export default function RouteSearchBar({
   from,
   to,
   onFromChange,
   onToChange,
-  onCampus,
-  onHome,
+  homeValue = "Home",
+  campusValue = CAMPUS_SEARCH_TEXT,
+  onFilled, // (field, value, {from, to}) => void — fires after Home/Campus fills a field
   onLater,
   onSubmit,
   submitLabel = "Search",
@@ -25,8 +30,17 @@ export default function RouteSearchBar({
   toPlaceholder = "Where to?",
   children, // optional extra fields (e.g. driver's day/time/seats row)
 }) {
-  const campusActive = isCampusText(to);
-  const homeActive = isCampusText(from);
+  const [activeField, setActiveField] = useState("to");
+
+  const fillActiveField = (value) => {
+    if (activeField === "from") {
+      onFromChange(value);
+      onFilled?.("from", value, { from: value, to });
+    } else {
+      onToChange(value);
+      onFilled?.("to", value, { from, to: value });
+    }
+  };
 
   return (
     <div style={{ marginBottom: 20 }}>
@@ -43,6 +57,7 @@ export default function RouteSearchBar({
               placeholder={fromPlaceholder}
               value={from}
               onChange={(e) => onFromChange(e.target.value)}
+              onFocus={() => setActiveField("from")}
               className="route-input"
             />
             <button type="submit" className="route-search-btn" aria-label={submitLabel}>
@@ -55,18 +70,15 @@ export default function RouteSearchBar({
               placeholder={toPlaceholder}
               value={to}
               onChange={(e) => onToChange(e.target.value)}
+              onFocus={() => setActiveField("to")}
               className="route-input"
             />
           </div>
         </div>
 
         <div className="row" style={{ gap: 6, marginTop: 12, flexWrap: "nowrap" }}>
-          <ShortcutButton active={homeActive} onClick={onHome}>
-            🏠 Home
-          </ShortcutButton>
-          <ShortcutButton active={campusActive} onClick={onCampus}>
-            🎓 Campus
-          </ShortcutButton>
+          <ShortcutButton onClick={() => fillActiveField(homeValue)}>🏠 Home</ShortcutButton>
+          <ShortcutButton onClick={() => fillActiveField(campusValue)}>🎓 Campus</ShortcutButton>
           {onLater && (
             <ShortcutButton onClick={onLater}>
               📅 Later
@@ -160,7 +172,7 @@ export default function RouteSearchBar({
   );
 }
 
-function ShortcutButton({ active, onClick, children }) {
+function ShortcutButton({ onClick, children }) {
   return (
     <button
       type="button"
@@ -171,9 +183,9 @@ function ShortcutButton({ active, onClick, children }) {
         whiteSpace: "nowrap",
         fontSize: 12,
         padding: "8px 10px",
-        background: active ? "var(--primary)" : "transparent",
-        color: active ? "#fff" : "var(--text-muted)",
-        border: active ? "none" : "1px solid var(--border)",
+        background: "transparent",
+        color: "var(--text-muted)",
+        border: "1px solid var(--border)",
       }}
     >
       {children}
