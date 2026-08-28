@@ -322,71 +322,13 @@ export default function RiderDashboard() {
     }
     client
       .get(`/rides/driver/${activeRide.driver_id}/stops`, { params: { exclude_ride_request_id: activeRide.id } })
-      .then(({ data }) => setBookedStops(data.map((s) => s.address).filter(Boolean)))
+      .then(({ data }) =>
+        // Only pickups become a stop on the route — someone meeting
+        // outside isn't asking the driver to detour to their door.
+        setBookedStops(data.filter((s) => s.pickup_type === "pickup").map((s) => s.address).filter(Boolean))
+      )
       .catch(() => setBookedStops([]));
   }, [activeRide]);
-
-  // A driver "matches" if they currently have an open seat on any slot.
-  const driverHasOpenSeat = useMemo(() => {
-    const openByDriver = new Set();
-    slots.forEach((s) => {
-      if (s.seats_available > 0) openByDriver.add(s.driver_id);
-    });
-    return openByDriver;
-  }, [slots]);
-
-  // The map only ever shows drivers who currently have an open seat — per
-  // spec, unavailable drivers don't get a car icon on the map at all.
-  const driverPins = useMemo(
-    () =>
-      drivers
-        .filter((d) => d.address && driverHasOpenSeat.has(d.id))
-        .map((d) => {
-          const myRequestToThisDriver = myRides.find((r) => r.driver_id === d.id);
-          const driverSlots = slots.filter((s) => s.driver_id === d.id);
-          return {
-            id: d.id,
-            address: d.address,
-            kind: "driver",
-            name: `${d.first_name} ${d.last_name}`,
-            rating: d.driver_profile?.avg_rating,
-            photoUrl: d.profile_photo_url,
-            matching: true,
-            availabilityText: driverSlots.length ? `Free ${driverSlots.map(slotLabel).join(", ")}` : null,
-            badge: myRequestToThisDriver
-              ? { kind: myRequestToThisDriver.pickup_type, meetOutsideDisplay: "distance" }
-              : null,
-          };
-        }),
-    [drivers, myRides, driverHasOpenSeat, slots]
-  );
-
-  // Clicking a driver's icon on the (expanded, interactive) map selects
-  // that ride below, same as tapping its row — it doesn't jump straight
-  // into the request flow.
-  const handlePersonClick = (person) => {
-    const slot = slots.find((s) => s.driver_id === person.id && s.seats_available > 0) || slots.find((s) => s.driver_id === person.id);
-    if (slot) {
-      setSelectedSlotId(slot.id);
-      setMapExpanded(false);
-    }
-  };
-
-  const campusAddress = addressForUniversity(user.university);
-  // "custom" (free-typed text that isn't campus/home) falls back to the
-  // campus orientation for the map — arbitrary route text isn't a safe
-  // geocoding target, only real profile/campus addresses are.
-  const orientedHomeAddress = direction === "to_home" ? campusAddress : user.address;
-  const orientedDestinationAddress = direction === "to_home" ? user.address : campusAddress;
-
-  const mapProps = {
-    homeAddress: orientedHomeAddress,
-    destinationAddress: orientedDestinationAddress,
-    others: driverPins,
-    routeStops: bookedStops,
-    onPersonClick: handlePersonClick,
-    emptyHint: "Add your home address (see your profile) to see the map.",
-  };
 
   // The starting point you typed, if it geocoded — otherwise your profile
   // address is the fallback origin "Choose a ride" measures distance from.
@@ -433,6 +375,65 @@ export default function RiderDashboard() {
   // below, separately from just "first in the sorted list" (which could
   // be a soonest-but-full slot).
   const nextAvailableSlot = visibleSlots.find((s) => s.seats_available > 0);
+
+  // Exactly what's on screen right now — same filters, same page of
+  // results. The map mirrors this, not the full unfiltered slot list, so
+  // a pin never shows for a driver "Choose a ride" isn't currently
+  // displaying.
+  const displayedSlots = useMemo(() => visibleSlots.slice(0, visibleCount), [visibleSlots, visibleCount]);
+
+  const driverPins = useMemo(() => {
+    const displayedDriverIds = new Set(displayedSlots.map((s) => s.driver_id));
+    return drivers
+      .filter((d) => d.address && displayedDriverIds.has(d.id))
+      .map((d) => {
+        const myRequestToThisDriver = myRides.find((r) => r.driver_id === d.id);
+        const driverSlotsHere = displayedSlots.filter((s) => s.driver_id === d.id);
+        return {
+          id: d.id,
+          address: d.address,
+          kind: "driver",
+          name: `${d.first_name} ${d.last_name}`,
+          rating: d.driver_profile?.avg_rating,
+          photoUrl: d.profile_photo_url,
+          matching: true,
+          availabilityText: driverSlotsHere.length ? `Free ${driverSlotsHere.map(slotLabel).join(", ")}` : null,
+          badge: myRequestToThisDriver
+            ? { kind: myRequestToThisDriver.pickup_type, meetOutsideDisplay: "distance" }
+            : null,
+        };
+      });
+  }, [drivers, myRides, displayedSlots]);
+
+  // Clicking a driver's icon on the (expanded, interactive) map selects
+  // that ride below, same as tapping its row — it doesn't jump straight
+  // into the request flow. Looks up the slot within what's displayed,
+  // same reasoning as driverPins above.
+  const handlePersonClick = (person) => {
+    const slot =
+      displayedSlots.find((s) => s.driver_id === person.id && s.seats_available > 0) ||
+      displayedSlots.find((s) => s.driver_id === person.id);
+    if (slot) {
+      setSelectedSlotId(slot.id);
+      setMapExpanded(false);
+    }
+  };
+
+  const campusAddress = addressForUniversity(user.university);
+  // "custom" (free-typed text that isn't campus/home) falls back to the
+  // campus orientation for the map — arbitrary route text isn't a safe
+  // geocoding target, only real profile/campus addresses are.
+  const orientedHomeAddress = direction === "to_home" ? campusAddress : user.address;
+  const orientedDestinationAddress = direction === "to_home" ? user.address : campusAddress;
+
+  const mapProps = {
+    homeAddress: orientedHomeAddress,
+    destinationAddress: orientedDestinationAddress,
+    others: driverPins,
+    routeStops: bookedStops,
+    onPersonClick: handlePersonClick,
+    emptyHint: "Add your home address (see your profile) to see the map.",
+  };
 
   // Start back at the first page, and clear any selected ride, whenever
   // the filters/direction/range change the result set out from under it.

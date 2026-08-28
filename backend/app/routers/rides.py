@@ -77,8 +77,31 @@ def update_ride_request(
         raise HTTPException(status_code=403, detail="Not part of this ride request")
 
     data = payload.model_dump(exclude_unset=True)
+    previous_status = ride_request.status
     for field, value in data.items():
         setattr(ride_request, field, value)
+
+    # Accepting a request claims a seat on the linked slot; explicitly
+    # un-confirming one (decline/cancel — not "completed", which is just
+    # the natural next step for a confirmed ride and shouldn't free
+    # capacity back up) gives it back. A custom time/place request has no
+    # slot to adjust.
+    if "status" in data and ride_request.availability_id is not None:
+        slot = db.get(models.Availability, ride_request.availability_id)
+        if slot:
+            newly_confirmed = (
+                previous_status != models.RideStatus.confirmed
+                and ride_request.status == models.RideStatus.confirmed
+            )
+            newly_cancelled = previous_status == models.RideStatus.confirmed and ride_request.status in (
+                models.RideStatus.declined,
+                models.RideStatus.cancelled,
+            )
+            if newly_confirmed and slot.seats_available > 0:
+                slot.seats_available -= 1
+            elif newly_cancelled:
+                slot.seats_available += 1
+            db.add(slot)
 
     db.add(ride_request)
     db.commit()
