@@ -3,15 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import client, { apiErrorMessage } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { StarInput } from "../components/StarRating";
-
-const PAYMENT_LABELS = {
-  venmo: "Venmo",
-  cash: "Cash",
-  beer: "Beer",
-  aux_cord: "Aux cord",
-  coffee: "Coffee",
-  other: "Other",
-};
+import { PAYMENT_LABELS } from "../lib/paymentMethods";
 
 export default function ReviewPage() {
   const { rideRequestId } = useParams();

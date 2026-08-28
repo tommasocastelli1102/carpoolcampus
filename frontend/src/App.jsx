@@ -7,6 +7,7 @@ import RiderDashboard from "./pages/RiderDashboard";
 import DriverDashboard from "./pages/DriverDashboard";
 import ChatPage from "./pages/ChatPage";
 import ReviewPage from "./pages/ReviewPage";
+import BalancePage from "./pages/BalancePage";
 
 export default function App() {
   return (
@@ -45,6 +46,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ReviewPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/balance"
+          element={
+            <ProtectedRoute>
+              <BalancePage />
             </ProtectedRoute>
           }
         />

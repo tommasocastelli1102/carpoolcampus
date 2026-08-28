@@ -5,14 +5,7 @@ import client, { apiErrorMessage } from "../api/client";
 import ComingSoonModal from "../components/ComingSoonModal";
 import { EyeIcon, EyeOffIcon, PlusIcon, XIcon } from "../components/Icons";
 import { UNIVERSITIES } from "../lib/universities";
-
-const PAYMENT_OPTIONS = [
-  { value: "venmo", label: "Venmo" },
-  { value: "cash", label: "Cash" },
-  { value: "beer", label: "Beer" },
-  { value: "aux_cord", label: "Aux cord / set the music" },
-  { value: "coffee", label: "Coffee" },
-];
+import { PAYMENT_METHODS as PAYMENT_OPTIONS } from "../lib/paymentMethods";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -36,7 +29,11 @@ const emptyForm = {
 
 export default function AuthPage() {
   const [searchParams] = useSearchParams();
-  const initialRole = searchParams.get("role") === "driver" ? "driver" : "rider";
+  // "driver" here only ever means "has a car" — it maps to role "both" below
+  // so car owners always keep rider access too. There's no driver-only
+  // registration path: having a car is a profile trait, and which one you
+  // are for a given trip is a per-ride choice, not something you lock in here.
+  const initialRole = searchParams.get("role") === "driver" ? "both" : "rider";
   const initialMode = searchParams.get("mode") === "register" ? "register" : "login";
 
   const [mode, setMode] = useState(initialMode); // "login" | "register"
@@ -169,11 +166,9 @@ export default function AuthPage() {
         </div>
 
         <div
-          className="row"
           style={{
-            gap: 8,
             marginBottom: showRoleSelector ? 26 : 0,
-            maxHeight: showRoleSelector ? 60 : 0,
+            maxHeight: showRoleSelector ? 120 : 0,
             opacity: showRoleSelector ? 1 : 0,
             overflow: "hidden",
             pointerEvents: showRoleSelector ? "auto" : "none",
@@ -181,15 +176,20 @@ export default function AuthPage() {
           }}
           aria-hidden={!showRoleSelector}
         >
-          <RoleButton active={role === "rider"} onClick={() => setRole("rider")}>
-            🎒 I'm a Rider
-          </RoleButton>
-          <RoleButton active={role === "driver"} onClick={() => setRole("driver")}>
-            🚗 I'm a Driver
-          </RoleButton>
-          <RoleButton active={role === "both"} onClick={() => setRole("both")}>
-            Both
-          </RoleButton>
+          <label style={{ marginBottom: 8, display: "block" }}>Do you have a car?</label>
+          <div className="row" style={{ gap: 8 }}>
+            <RoleButton active={role === "both"} onClick={() => setRole("both")}>
+              🚗 Yes, I have a car
+            </RoleButton>
+            <RoleButton active={role === "rider"} onClick={() => setRole("rider")}>
+              🎒 No, I don't
+            </RoleButton>
+          </div>
+          <p className="helper-text">
+            This isn't permanent — whether you drive or ride is up to you on any given trip. Having a
+            car just unlocks the driver dashboard too, and you can turn it on later from your profile
+            if that changes.
+          </p>
         </div>
         {/* --- End fixed header --- */}
 
@@ -324,7 +324,7 @@ export default function AuthPage() {
                 <div className="field">
                   <label>Preferred payment methods</label>
                   <div className="checkbox-grid">
-                    {PAYMENT_OPTIONS.map((opt) => (
+                    {PAYMENT_OPTIONS.filter((opt) => opt.value !== "other").map((opt) => (
                       <label
                         key={opt.value}
                         className={`checkbox-pill ${form.payment_methods.includes(opt.value) ? "checked" : ""}`}

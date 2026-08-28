@@ -63,3 +63,37 @@ def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
 @router.get("/me", response_model=schemas.UserOut)
 def me(current_user: models.User = Depends(get_current_user)):
     return current_user
+
+
+@router.post("/enable-driving", response_model=schemas.UserOut)
+def enable_driving(
+    payload: schemas.EnableDrivingRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Rider-only accounts opt into driving too — mirrors what registering
+    as "both" would have set up, so switching between driving and riding
+    stays a per-ride choice rather than something locked in at signup."""
+    if current_user.role == models.UserRole.rider:
+        current_user.role = models.UserRole.both
+
+    if not current_user.driver_profile:
+        db.add(
+            models.DriverProfile(
+                user_id=current_user.id,
+                payment_methods=payload.payment_methods or [],
+                payment_method_other=payload.payment_method_other,
+                bio=payload.bio,
+            )
+        )
+    else:
+        if payload.payment_methods is not None:
+            current_user.driver_profile.payment_methods = payload.payment_methods
+        if payload.payment_method_other is not None:
+            current_user.driver_profile.payment_method_other = payload.payment_method_other
+        if payload.bio is not None:
+            current_user.driver_profile.bio = payload.bio
+
+    db.commit()
+    db.refresh(current_user)
+    return current_user

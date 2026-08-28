@@ -9,16 +9,9 @@ import CampusMap, { MapLegend } from "../components/CampusMap";
 import MapModal from "../components/MapModal";
 import { addressForUniversity } from "../lib/universities";
 import { CarIcon } from "../components/Icons";
+import { PAYMENT_LABELS } from "../lib/paymentMethods";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const PAYMENT_LABELS = {
-  venmo: "Venmo",
-  cash: "Cash",
-  beer: "Beer",
-  aux_cord: "Aux cord",
-  coffee: "Coffee",
-  other: "Other",
-};
 
 const DISTANCE_OPTIONS = [
   { value: "", label: "Distance" },

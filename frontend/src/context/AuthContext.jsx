@@ -3,6 +3,10 @@ import client, { apiErrorMessage } from "../api/client";
 
 const AuthContext = createContext(null);
 
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -16,9 +20,30 @@ export function AuthProvider({ children }) {
     try {
       const { data } = await client.get("/auth/me");
       setUser(data);
-    } catch {
-      localStorage.removeItem("cc_token");
-      setUser(null);
+    } catch (err) {
+      if (err.response?.status === 401) {
+        // The token itself was rejected — genuinely signed out.
+        localStorage.removeItem("cc_token");
+        setUser(null);
+      } else {
+        // Anything else (network error, timeout, 5xx) is most likely the
+        // free-tier backend waking up from sleep, not an invalid session —
+        // retry once before giving up. Crucially, don't clear the token on
+        // this path: if the retry also fails, a plain page refresh once the
+        // backend is actually awake will still restore the session, instead
+        // of silently signing the user out on what was really just a slow
+        // cold start.
+        await wait(4000);
+        try {
+          const { data } = await client.get("/auth/me");
+          setUser(data);
+        } catch (retryErr) {
+          if (retryErr.response?.status === 401) {
+            localStorage.removeItem("cc_token");
+          }
+          setUser(null);
+        }
+      }
     } finally {
       setLoading(false);
     }

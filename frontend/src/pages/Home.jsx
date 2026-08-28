@@ -71,8 +71,11 @@ export default function Home() {
             </ul>
             <div style={{ marginTop: "auto" }}>
               <Link to="/auth?mode=register&role=rider">
-                <button className="btn btn-primary btn-block">Register as a Rider</button>
+                <button className="btn btn-primary btn-block">Register</button>
               </Link>
+              <p className="muted" style={{ fontSize: 13, marginTop: 10, textAlign: "center" }}>
+                Get a car later? You can turn on driving from your profile any time.
+              </p>
             </div>
           </div>
 
@@ -101,8 +104,11 @@ export default function Home() {
             </ul>
             <div style={{ marginTop: "auto" }}>
               <Link to="/auth?mode=register&role=driver">
-                <button className="btn btn-primary btn-block">Register as a Driver</button>
+                <button className="btn btn-primary btn-block">Register</button>
               </Link>
+              <p className="muted" style={{ fontSize: 13, marginTop: 10, textAlign: "center" }}>
+                Driving isn't permanent — you'll still be able to ride along on days you'd rather not drive.
+              </p>
             </div>
           </div>
         </div>
@@ -153,11 +159,89 @@ export default function Home() {
         </div>
       </section>
 
+      {/* How it works */}
+      <section className="container" style={{ marginTop: 8, marginBottom: 56 }}>
+        <h2 style={{ textAlign: "center", fontSize: 28, marginBottom: 8 }}>How it works, start to finish</h2>
+        <p className="muted" style={{ textAlign: "center", maxWidth: 560, marginInline: "auto", marginBottom: 32 }}>
+          Every ride follows the same simple path, from finding someone to commute with to settling
+          up afterward.
+        </p>
+        <div className="how-it-works-grid">
+          <HowItWorksStep number={1} icon="🔍" title="Find or offer a ride">
+            Browse nearby driver routes and time slots, or — if you have a car — post your own
+            availability so riders can find you.
+          </HowItWorksStep>
+          <HowItWorksStep number={2} icon="✋" title="Request to ride">
+            Pick a time slot that works and send a request. It's just a request until the driver
+            responds.
+          </HowItWorksStep>
+          <HowItWorksStep number={3} icon="✅" title="Driver accepts">
+            The driver reviews your request and confirms the seat. Once confirmed, you can message
+            each other to sort out pickup details.
+          </HowItWorksStep>
+          <HowItWorksStep number={4} icon="🚗" title="The ride happens">
+            Meet up and commute together, just like carpooling with a friend.
+          </HowItWorksStep>
+          <HowItWorksStep number={5} icon="⭐" title="Rate & record payment">
+            Afterward, leave a quick review and log how (or whether) you paid — Venmo, Zelle, cash,
+            or something else entirely.
+          </HowItWorksStep>
+          <HowItWorksStep number={6} icon="📊" title="Your balance updates">
+            Anything you haven't marked paid shows up automatically on your{" "}
+            <Link to="/balance" style={{ color: "var(--primary-hover)", fontWeight: 600 }}>
+              Balances
+            </Link>{" "}
+            page — a running "who owes whom" for every ride, like a mini Splitwise for your commute.
+          </HowItWorksStep>
+        </div>
+      </section>
+
       <style>{`
         @media (max-width: 760px) {
           .home-cards { grid-template-columns: 1fr !important; }
         }
+        .how-it-works-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 20px;
+        }
+        @media (max-width: 900px) {
+          .how-it-works-grid { grid-template-columns: 1fr 1fr !important; }
+        }
+        @media (max-width: 600px) {
+          .how-it-works-grid { grid-template-columns: 1fr !important; }
+        }
       `}</style>
+    </div>
+  );
+}
+
+function HowItWorksStep({ number, icon, title, children }) {
+  return (
+    <div className="card" style={{ position: "relative" }}>
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          top: 16,
+          right: 16,
+          fontSize: 12,
+          fontWeight: 700,
+          color: "var(--text-muted)",
+          border: "1px solid var(--border)",
+          borderRadius: "50%",
+          width: 22,
+          height: 22,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {number}
+      </div>
+      <div style={{ fontSize: 26, marginBottom: 10 }}>{icon}</div>
+      <h3 style={{ fontSize: 16, marginBottom: 8 }}>{title}</h3>
+      <p className="muted" style={{ fontSize: 14, lineHeight: 1.6 }}>{children}</p>
     </div>
   );
 }

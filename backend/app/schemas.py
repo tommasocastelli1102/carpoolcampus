@@ -34,6 +34,16 @@ class UserLogin(BaseModel):
     password: str
 
 
+class EnableDrivingRequest(BaseModel):
+    """Lets an existing rider-only account start driving too, without
+    re-registering — having a car is a profile trait, not a permanent
+    choice made once at signup."""
+
+    payment_methods: Optional[list[str]] = None
+    payment_method_other: Optional[str] = None
+    bio: Optional[str] = None
+
+
 class DriverProfileOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     payment_methods: list[str] = []
@@ -192,3 +202,17 @@ class ReviewOut(BaseModel):
     paid_method: Optional[str] = None
     created_at: datetime
     reviewer: Optional[UserOut] = None
+
+
+# ---------- Balances ----------
+
+class BalanceOut(BaseModel):
+    """Net of what you owe/are owed with one other person, derived from
+    completed rides that haven't been marked paid yet. Positive amount =
+    they owe you; negative = you owe them."""
+
+    counterparty_id: int
+    counterparty_name: str
+    counterparty_photo: Optional[str] = None
+    amount: float
+    unpaid_ride_ids: list[int]

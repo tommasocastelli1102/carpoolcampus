@@ -2,9 +2,10 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import NotificationBell from "./NotificationBell";
 import ProfileMenu from "./ProfileMenu";
+import { HistogramIcon } from "./Icons";
 
 export default function Navbar() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
   return (
     <header
@@ -41,9 +42,35 @@ export default function Navbar() {
                   🎒 Rider
                 </Link>
               )}
+              <Link
+                to="/balance"
+                aria-label="Balances"
+                style={{
+                  position: "relative",
+                  background: "transparent",
+                  border: "1px solid var(--border)",
+                  borderRadius: "50%",
+                  width: 36,
+                  height: 36,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "var(--text)",
+                  flexShrink: 0,
+                }}
+              >
+                <HistogramIcon size={18} />
+              </Link>
               <NotificationBell />
               <ProfileMenu />
             </>
+          ) : loading ? (
+            // A token exists and we're still confirming it (e.g. the backend
+            // is waking up from a free-tier cold start) — show nothing
+            // rather than a "Log In / Register" button, so an already
+            // logged-in user can't click through to the login screen while
+            // the session is still being restored.
+            <div style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--border)", flexShrink: 0 }} />
           ) : (
             <Link to="/auth">
               <button className="btn btn-primary btn-sm">Log In / Register</button>

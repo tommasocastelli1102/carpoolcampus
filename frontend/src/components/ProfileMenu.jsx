@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import client from "../api/client";
+import client, { apiErrorMessage } from "../api/client";
 import { geocodeMany } from "../api/geocode";
 import { haversineMiles, milesToKm, co2SavedKg } from "../lib/geo";
 import { useAuth } from "../context/AuthContext";
@@ -28,12 +28,14 @@ function rideEndpoints(ride) {
 }
 
 export default function ProfileMenu() {
-  const { user, logout } = useAuth();
+  const { user, setUser, logout } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [menuPos, setMenuPos] = useState(null);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState(null); // { kmTravelled, co2Kg, rating, reviewCount }
+  const [enablingDriving, setEnablingDriving] = useState(false);
+  const [enableError, setEnableError] = useState("");
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
 
@@ -117,6 +119,21 @@ export default function ProfileMenu() {
     setOpen(false);
     logout();
     navigate("/home");
+  };
+
+  const handleEnableDriving = async () => {
+    setEnableError("");
+    setEnablingDriving(true);
+    try {
+      const { data } = await client.post("/auth/enable-driving", {});
+      setUser(data);
+      setOpen(false);
+      navigate("/driver");
+    } catch (err) {
+      setEnableError(apiErrorMessage(err, "Couldn't turn on driving. Try again."));
+    } finally {
+      setEnablingDriving(false);
+    }
   };
 
   return (
@@ -213,6 +230,24 @@ export default function ProfileMenu() {
               </div>
             </div>
 
+            {user.role === "rider" && (
+              <div style={{ padding: "0 18px 14px", borderTop: "1px solid var(--border)", paddingTop: 14 }}>
+                <button
+                  type="button"
+                  onClick={handleEnableDriving}
+                  disabled={enablingDriving}
+                  className="btn btn-sm btn-ghost"
+                  style={{ width: "100%" }}
+                >
+                  {enablingDriving ? "Turning on…" : "🚗 I have a car — start driving"}
+                </button>
+                <p className="helper-text" style={{ marginBottom: 0 }}>
+                  Driving is per-ride, not permanent — you'll still see rider options too.
+                </p>
+                {enableError && <p className="error-text" style={{ marginTop: 6, marginBottom: 0 }}>{enableError}</p>}
+              </div>
+            )}
+
             <button
               type="button"
               onClick={handleLogout}
@@ -223,7 +258,7 @@ export default function ProfileMenu() {
                 padding: "12px 18px",
                 background: "transparent",
                 border: "none",
-                borderTop: "1px solid var(--border)",
+                borderTop: user.role === "rider" ? "none" : "1px solid var(--border)",
                 cursor: "pointer",
                 color: "var(--danger)",
                 fontSize: 13,
