@@ -12,7 +12,7 @@ import RouteSearchBar from "../components/RouteSearchBar";
 import AddAvailabilityForm from "../components/AddAvailabilityForm";
 import ComingSoonModal from "../components/ComingSoonModal";
 import { addressForUniversity } from "../lib/universities";
-import { isCampusText, CAMPUS_SEARCH_TEXT } from "../lib/campus";
+import { isCampusText } from "../lib/campus";
 import { CarIcon } from "../components/Icons";
 import { PAYMENT_LABELS } from "../lib/paymentMethods";
 import { getSearchRadius, onSearchRadiusChange } from "../lib/searchRadius";
@@ -94,6 +94,28 @@ function minutesUntilNext(slot, now = new Date()) {
   return Infinity;
 }
 
+const TIME_BUCKET_START_HOUR = { morning: 6, afternoon: 12, evening: 17 };
+
+/** The moment a day/time filter actually means, so a fallback list (see
+ * `visibleSlots`) can be sorted starting from *that* instant instead of
+ * "now" — e.g. "Wednesday evening" becomes next Wednesday at 17:00. Only
+ * a time bucket with no day picked has nothing to anchor a specific day
+ * to, so that case just falls back to "now". */
+function referenceTimeFor(dayFilter, timeFilter) {
+  const now = new Date();
+  if (dayFilter === "") return now;
+  const targetDay = Number(dayFilter); // 0=Mon..6=Sun
+  const jsDay = now.getDay(); // 0=Sun..6=Sat
+  const ourDay = (jsDay + 6) % 7;
+  let dayDiff = targetDay - ourDay;
+  if (dayDiff < 0) dayDiff += 7;
+  const target = new Date(now);
+  target.setDate(now.getDate() + dayDiff);
+  target.setHours(timeFilter ? TIME_BUCKET_START_HOUR[timeFilter] : 0, 0, 0, 0);
+  if (dayDiff === 0 && target < now) target.setDate(target.getDate() + 7);
+  return target;
+}
+
 /** "in 40m", "in 3h", "in 2d" — how far off a slot's next occurrence is. */
 function formatTimeUntil(minutes) {
   if (!Number.isFinite(minutes)) return null;
@@ -154,7 +176,7 @@ export default function RiderDashboard() {
   const [selectedSlotId, setSelectedSlotId] = useState(null); // which ride is highlighted in the list, like tapping a ride in Uber
   const [myRides, setMyRides] = useState([]);
   const [fromText, setFromText] = useState("");
-  const [toText, setToText] = useState(CAMPUS_SEARCH_TEXT); // defaults to "headed to campus"
+  const [toText, setToText] = useState(""); // left blank on purpose — no pre-filled destination
   const [drivers, setDrivers] = useState([]);
   const [bookedStops, setBookedStops] = useState([]); // addresses of other riders already confirmed on "my" driver's route
   const [mapExpanded, setMapExpanded] = useState(false);
@@ -336,8 +358,12 @@ export default function RiderDashboard() {
   // address is the fallback origin "Choose a ride" measures distance from.
   const origin = originCoord || riderCoord;
 
-  const visibleSlots = useMemo(() => {
-    let list = slots.map((s) => {
+  // `usedTimeFallback` is true when the day/time picked in the "Later"
+  // modal matched nothing and the list fell back to showing everything
+  // else instead — surfaced so the UI can explain why what's listed
+  // doesn't all line up with the exact day/time that was asked for.
+  const { list: visibleSlots, usedTimeFallback } = useMemo(() => {
+    let pool = slots.map((s) => {
       const coord = s.driver?.address ? driverCoords.get(s.driver.address) : null;
       const distance = origin && coord ? haversineMiles(origin, coord) : null;
       return { ...s, _distance: distance };
@@ -346,31 +372,43 @@ export default function RiderDashboard() {
     // Which way are you headed? "To campus" keeps rides ending near
     // campus, "Going home" keeps rides starting from campus, otherwise
     // whatever's typed in From/To is matched directly.
-    if (direction === "to_campus") list = list.filter((s) => isCampusText(s.route_to));
-    else if (direction === "to_home") list = list.filter((s) => isCampusText(s.route_from));
+    if (direction === "to_campus") pool = pool.filter((s) => isCampusText(s.route_to));
+    else if (direction === "to_home") pool = pool.filter((s) => isCampusText(s.route_from));
     else {
       const fromNeedle = fromText.trim().toLowerCase();
       const toNeedle = toText.trim().toLowerCase();
-      if (fromNeedle) list = list.filter((s) => s.route_from.toLowerCase().includes(fromNeedle));
-      if (toNeedle) list = list.filter((s) => s.route_to.toLowerCase().includes(toNeedle));
+      if (fromNeedle) pool = pool.filter((s) => s.route_from.toLowerCase().includes(fromNeedle));
+      if (toNeedle) pool = pool.filter((s) => s.route_to.toLowerCase().includes(toNeedle));
     }
-
-    if (dayFilter !== "") list = list.filter((s) => String(s.day_of_week) === dayFilter);
-    if (timeFilter) list = list.filter((s) => timeBucket(s.start_time) === timeFilter);
 
     // Only rides within the configured range of the starting point —
     // slots whose distance couldn't be computed (address didn't geocode)
     // are kept rather than hidden, so a geocoding gap never silently
     // drops a real result.
-    if (origin) list = list.filter((s) => s._distance == null || s._distance <= searchRadius);
+    if (origin) pool = pool.filter((s) => s._distance == null || s._distance <= searchRadius);
+
+    // Day/time are a preference, not a hard wall: if nothing matches the
+    // exact day+time picked, don't show an empty list — fall back to
+    // everything else in `pool`, re-sorted starting from that same
+    // moment (rather than "now") and rolling forward, so the rider still
+    // sees what's coming up from the point they were asking about.
+    const hasDayOrTimeFilter = dayFilter !== "" || timeFilter !== "";
+    let strict = pool;
+    if (dayFilter !== "") strict = strict.filter((s) => String(s.day_of_week) === dayFilter);
+    if (timeFilter) strict = strict.filter((s) => timeBucket(s.start_time) === timeFilter);
+
+    const fellBack = hasDayOrTimeFilter && strict.length === 0 && pool.length > 0;
+    const list = fellBack ? pool : strict;
+    const referenceTime = fellBack ? referenceTimeFor(dayFilter, timeFilter) : new Date();
 
     // Soonest next occurrence first — the top of "Choose a ride" is
     // always the next ride you could actually catch, not just the
     // closest one. Distance breaks ties.
-    const now = new Date();
-    list = list.map((s) => ({ ...s, _minutesUntil: minutesUntilNext(s, now) }));
-    list.sort((a, b) => a._minutesUntil - b._minutesUntil || (a._distance ?? Infinity) - (b._distance ?? Infinity));
-    return list;
+    const sorted = list
+      .map((s) => ({ ...s, _minutesUntil: minutesUntilNext(s, referenceTime) }))
+      .sort((a, b) => a._minutesUntil - b._minutesUntil || (a._distance ?? Infinity) - (b._distance ?? Infinity));
+
+    return { list: sorted, usedTimeFallback: fellBack };
   }, [slots, driverCoords, origin, direction, fromText, toText, dayFilter, timeFilter, searchRadius]);
 
   // The soonest ride that actually has an open seat — badged in the list
@@ -498,6 +536,11 @@ export default function RiderDashboard() {
           </p>
         ) : (
           <div className="stack">
+            {usedTimeFallback && (
+              <p className="muted" style={{ fontSize: 13, marginTop: -4 }}>
+                Nothing at that exact day/time — showing what's coming up from then on instead.
+              </p>
+            )}
             {visibleSlots.slice(0, visibleCount).map((slot) => (
               <Fragment key={slot.id}>
                 <RideOptionRow
