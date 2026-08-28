@@ -487,7 +487,7 @@ export default function RiderDashboard() {
       <CampusMap {...mapProps} variant="compact" onExpandRequest={() => setMapExpanded(true)} />
       <MapLegend />
 
-      <CollapsibleSection title="Choose a ride" style={{ marginTop: 28 }}>
+      <CollapsibleSection title="Choose a ride" defaultOpen style={{ marginTop: 28 }}>
         {loading ? (
           <div className="spinner" />
         ) : visibleSlots.length === 0 ? (
