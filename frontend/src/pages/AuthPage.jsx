@@ -193,10 +193,6 @@ export default function AuthPage() {
               onClick={() => setRole("rider")}
             />
           </div>
-          <p className="helper-text">
-            This isn't permanent — whether you drive or ride is up to you on any given trip. You can
-            turn driving on later from your profile if that changes.
-          </p>
         </div>
         {/* --- End fixed header --- */}
 

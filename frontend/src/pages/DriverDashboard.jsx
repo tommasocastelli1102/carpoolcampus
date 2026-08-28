@@ -5,7 +5,9 @@ import { useAuth } from "../context/AuthContext";
 import ComingSoonModal from "../components/ComingSoonModal";
 import CampusMap, { MapLegend } from "../components/CampusMap";
 import MapModal from "../components/MapModal";
+import RouteSearchBar from "../components/RouteSearchBar";
 import { addressForUniversity } from "../lib/universities";
+import { isCampusText, CAMPUS_SEARCH_TEXT } from "../lib/campus";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -24,10 +26,23 @@ export default function DriverDashboard() {
   const [requests, setRequests] = useState([]);
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showAddSlot, setShowAddSlot] = useState(false);
   const [editRequest, setEditRequest] = useState(null);
   const [riders, setRiders] = useState([]);
   const [mapExpanded, setMapExpanded] = useState(false);
+
+  // The route being posted — same From/To + Campus/Home shortcut bar the
+  // rider dashboard searches with; here it describes the route you're
+  // offering instead of one you're looking for.
+  const [fromText, setFromText] = useState(user.address || "");
+  const [toText, setToText] = useState(CAMPUS_SEARCH_TEXT);
+  const [dayOfWeek, setDayOfWeek] = useState("0");
+  const [startTime, setStartTime] = useState("08:00");
+  const [endTime, setEndTime] = useState("09:00");
+  const [seats, setSeats] = useState(3);
+  const [postError, setPostError] = useState("");
+  const [posting, setPosting] = useState(false);
+
+  const direction = isCampusText(toText) ? "to_campus" : isCampusText(fromText) ? "to_home" : "custom";
 
   const load = async () => {
     setLoading(true);
@@ -60,6 +75,43 @@ export default function DriverDashboard() {
     load();
   };
 
+  const handlePostRoute = async (e) => {
+    e.preventDefault();
+    if (!fromText.trim() || !toText.trim()) {
+      setPostError("Add both a from and to location.");
+      return;
+    }
+    setPostError("");
+    setPosting(true);
+    try {
+      await client.post("/availability", {
+        day_of_week: Number(dayOfWeek),
+        start_time: startTime,
+        end_time: endTime,
+        route_from: fromText.trim(),
+        route_to: toText.trim(),
+        seats_available: Number(seats),
+      });
+      setFromText("");
+      setToText("");
+      load();
+    } catch (err) {
+      setPostError(apiErrorMessage(err, "Couldn't save that route."));
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  const handleCampusClick = () => {
+    setFromText(user.address || "Home");
+    setToText(CAMPUS_SEARCH_TEXT);
+  };
+
+  const handleHomeClick = () => {
+    setFromText(CAMPUS_SEARCH_TEXT);
+    setToText(user.address || "Home");
+  };
+
   // A rider "matches" this driver once they have any non-declined request
   // relationship — riders never see each other, and drivers don't see
   // rider names on the map, just where they'd need to go.
@@ -80,25 +132,59 @@ export default function DriverDashboard() {
     [riders, requests]
   );
 
+  const campusAddress = addressForUniversity(user.university);
+  const orientedHomeAddress = direction === "to_home" ? campusAddress : user.address;
+  const orientedDestinationAddress = direction === "to_home" ? user.address : campusAddress;
+
   const mapProps = {
-    homeAddress: user.address,
-    destinationAddress: addressForUniversity(user.university),
+    homeAddress: orientedHomeAddress,
+    destinationAddress: orientedDestinationAddress,
     others: riderPins,
     emptyHint: "Add your home address (see your profile) to see the map.",
   };
 
   return (
     <div className="container" style={{ paddingTop: 36 }}>
-      <div className="row-between" style={{ marginBottom: 4 }}>
-        <div className="row" style={{ gap: 12 }}>
-          <span style={{ fontSize: 30 }} aria-hidden>🚗</span>
-          <h1 style={{ fontSize: 30 }}>Driver dashboard</h1>
-        </div>
-        <button className="btn btn-primary btn-sm" onClick={() => setShowAddSlot(true)}>
-          + Add availability
-        </button>
+      <div className="row" style={{ gap: 12, marginBottom: 4 }}>
+        <span style={{ fontSize: 30 }} aria-hidden>🚗</span>
+        <h1 style={{ fontSize: 30 }}>Driver dashboard</h1>
       </div>
-      <p className="muted" style={{ marginBottom: 16 }}>Incoming ride requests, soonest first.</p>
+      <p className="muted" style={{ marginBottom: 16 }}>Post the route you're driving, then manage requests below.</p>
+
+      <RouteSearchBar
+        from={fromText}
+        to={toText}
+        onFromChange={setFromText}
+        onToChange={setToText}
+        onCampus={handleCampusClick}
+        onHome={handleHomeClick}
+        onSubmit={handlePostRoute}
+        submitLabel={posting ? "Posting…" : "Post route"}
+      >
+        <div className="field-row" style={{ flexBasis: "100%", marginTop: 10, marginBottom: 0 }}>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label style={{ fontSize: 11 }}>Day</label>
+            <select value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value)}>
+              {DAYS.map((d, i) => (
+                <option key={d} value={i}>{d}</option>
+              ))}
+            </select>
+          </div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label style={{ fontSize: 11 }}>Start</label>
+            <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+          </div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label style={{ fontSize: 11 }}>End</label>
+            <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+          </div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label style={{ fontSize: 11 }}>Seats</label>
+            <input type="number" min={1} max={8} value={seats} onChange={(e) => setSeats(e.target.value)} />
+          </div>
+        </div>
+        {postError && <p className="error-text" style={{ flexBasis: "100%", marginTop: 8, marginBottom: 0 }}>{postError}</p>}
+      </RouteSearchBar>
 
       <CampusMap {...mapProps} variant="compact" onExpandRequest={() => setMapExpanded(true)} />
       <MapLegend />
@@ -193,7 +279,6 @@ export default function DriverDashboard() {
         </div>
       )}
 
-      {showAddSlot && <AddSlotModal onClose={() => setShowAddSlot(false)} onSaved={() => { setShowAddSlot(false); load(); }} />}
       {editRequest && (
         <ComingSoonModal
           title="Request Edit"
@@ -203,91 +288,6 @@ export default function DriverDashboard() {
       )}
 
       {mapExpanded && <MapModal {...mapProps} onClose={() => setMapExpanded(false)} />}
-    </div>
-  );
-}
-
-function AddSlotModal({ onClose, onSaved }) {
-  const [form, setForm] = useState({
-    day_of_week: "0",
-    start_time: "08:00",
-    end_time: "09:00",
-    route_from: "",
-    route_to: "",
-    seats_available: 3,
-  });
-  const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    setSubmitting(true);
-    try {
-      await client.post("/availability", {
-        day_of_week: Number(form.day_of_week),
-        start_time: form.start_time,
-        end_time: form.end_time,
-        route_from: form.route_from,
-        route_to: form.route_to,
-        seats_available: Number(form.seats_available),
-      });
-      onSaved();
-    } catch (err) {
-      setError(apiErrorMessage(err, "Couldn't save that slot."));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 460, textAlign: "left" }} onClick={(e) => e.stopPropagation()}>
-        <h3 style={{ marginBottom: 18 }}>Add availability</h3>
-        <form onSubmit={handleSubmit}>
-          {error && <p className="error-text">{error}</p>}
-          <div className="field-row">
-            <div className="field">
-              <label>From</label>
-              <input required value={form.route_from} onChange={(e) => setForm((f) => ({ ...f, route_from: e.target.value }))} placeholder="Palms" />
-            </div>
-            <div className="field">
-              <label>To</label>
-              <input required value={form.route_to} onChange={(e) => setForm((f) => ({ ...f, route_to: e.target.value }))} placeholder="UCLA Anderson" />
-            </div>
-          </div>
-          <div className="field">
-            <label>Recurring day</label>
-            <select value={form.day_of_week} onChange={(e) => setForm((f) => ({ ...f, day_of_week: e.target.value }))}>
-              {DAYS.map((d, i) => (
-                <option key={d} value={i}>{d}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field-row">
-            <div className="field">
-              <label>Start time</label>
-              <input type="time" required value={form.start_time} onChange={(e) => setForm((f) => ({ ...f, start_time: e.target.value }))} />
-            </div>
-            <div className="field">
-              <label>End time</label>
-              <input type="time" required value={form.end_time} onChange={(e) => setForm((f) => ({ ...f, end_time: e.target.value }))} />
-            </div>
-          </div>
-          <div className="field">
-            <label>Seats available</label>
-            <input type="number" min={1} max={8} value={form.seats_available} onChange={(e) => setForm((f) => ({ ...f, seats_available: e.target.value }))} />
-          </div>
-          <div className="row" style={{ gap: 10, marginTop: 6 }}>
-            <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>
-              Cancel
-            </button>
-            <button className="btn btn-primary" style={{ flex: 1 }} disabled={submitting}>
-              {submitting ? "Saving…" : "Save slot"}
-            </button>
-          </div>
-        </form>
-      </div>
     </div>
   );
 }
