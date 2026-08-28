@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import client, { apiErrorMessage } from "../api/client";
 import { geocodeAddress, geocodeMany } from "../api/geocode";
@@ -509,13 +509,23 @@ export default function RiderDashboard() {
         ) : (
           <div className="stack">
             {visibleSlots.slice(0, visibleCount).map((slot) => (
-              <RideOptionRow
-                key={slot.id}
-                slot={slot}
-                isNext={slot.id === nextAvailableSlot?.id}
-                active={selectedSlotId === slot.id}
-                onClick={() => setSelectedSlotId(slot.id)}
-              />
+              <Fragment key={slot.id}>
+                <RideOptionRow
+                  slot={slot}
+                  isNext={slot.id === nextAvailableSlot?.id}
+                  active={selectedSlotId === slot.id}
+                  onClick={() => setSelectedSlotId((id) => (id === slot.id ? null : slot.id))}
+                />
+                {selectedSlotId === slot.id && (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-block"
+                    onClick={() => setSelected(slot)}
+                  >
+                    Request ride
+                  </button>
+                )}
+              </Fragment>
             ))}
             {visibleCount < visibleSlots.length && (
               <button
@@ -526,15 +536,6 @@ export default function RiderDashboard() {
                 Load more ({visibleSlots.length - visibleCount} more)
               </button>
             )}
-            <button
-              type="button"
-              className="btn btn-primary btn-block"
-              disabled={!selectedSlotId}
-              onClick={() => setSelected(visibleSlots.find((s) => s.id === selectedSlotId))}
-              style={{ marginTop: 4 }}
-            >
-              {selectedSlotId ? "Request ride" : "Select a ride"}
-            </button>
           </div>
         )}
       </div>
