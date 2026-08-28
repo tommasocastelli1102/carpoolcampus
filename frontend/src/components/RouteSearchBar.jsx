@@ -60,7 +60,7 @@ export default function RouteSearchBar({
           </div>
         </div>
 
-        <div className="row" style={{ gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+        <div className="row" style={{ gap: 6, marginTop: 12, flexWrap: "nowrap" }}>
           <ShortcutButton active={homeActive} onClick={onHome}>
             🏠 Home
           </ShortcutButton>
@@ -72,7 +72,7 @@ export default function RouteSearchBar({
               📅 Later
             </ShortcutButton>
           )}
-          <button className="btn btn-primary btn-sm" style={{ flexShrink: 0, marginLeft: "auto" }}>
+          <button className="btn btn-primary btn-sm" style={{ flexShrink: 0, marginLeft: "auto", fontSize: 12, padding: "8px 12px" }}>
             {submitLabel}
           </button>
         </div>
@@ -169,6 +169,8 @@ function ShortcutButton({ active, onClick, children }) {
       style={{
         flexShrink: 0,
         whiteSpace: "nowrap",
+        fontSize: 12,
+        padding: "8px 10px",
         background: active ? "var(--primary)" : "transparent",
         color: active ? "#fff" : "var(--text-muted)",
         border: active ? "none" : "1px solid var(--border)",

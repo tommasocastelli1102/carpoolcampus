@@ -48,8 +48,8 @@ export default function AuthPage() {
   const { login, register } = useAuth();
   const navigate = useNavigate();
 
-  const goToDashboard = (user) => {
-    navigate(user.role === "driver" ? "/driver" : "/rider");
+  const goToDashboard = () => {
+    navigate("/rider");
   };
 
   const handleField = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));

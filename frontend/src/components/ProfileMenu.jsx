@@ -128,7 +128,7 @@ export default function ProfileMenu() {
       const { data } = await client.post("/auth/enable-driving", {});
       setUser(data);
       setOpen(false);
-      navigate("/driver");
+      navigate("/rider");
     } catch (err) {
       setEnableError(apiErrorMessage(err, "Couldn't turn on driving. Try again."));
     } finally {

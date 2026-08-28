@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import client, { apiErrorMessage } from "../api/client";
 import { geocodeAddress, geocodeMany } from "../api/geocode";
 import { haversineMiles, formatMiles } from "../lib/geo";
@@ -8,12 +8,25 @@ import { StarDisplay } from "../components/StarRating";
 import CampusMap, { MapLegend } from "../components/CampusMap";
 import MapModal from "../components/MapModal";
 import RouteSearchBar from "../components/RouteSearchBar";
+import AddAvailabilityForm from "../components/AddAvailabilityForm";
+import ComingSoonModal from "../components/ComingSoonModal";
 import { addressForUniversity } from "../lib/universities";
 import { isCampusText, CAMPUS_SEARCH_TEXT } from "../lib/campus";
 import { CarIcon } from "../components/Icons";
 import { PAYMENT_LABELS } from "../lib/paymentMethods";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAYS_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+function requestSortKey(r) {
+  if (r.custom_time) return new Date(r.custom_time).getTime();
+  if (r.availability?.start_time) {
+    // Approximate: sort by time-of-day only, since recurring slots aren't tied to one date.
+    const [h, m] = r.availability.start_time.split(":");
+    return Number(h) * 60 + Number(m);
+  }
+  return new Date(r.created_at).getTime();
+}
 
 const DISTANCE_OPTIONS = [
   { value: "", label: "Distance" },
@@ -107,7 +120,7 @@ function PersonAvatar({ photoUrl, size = 40 }) {
 
 export default function RiderDashboard() {
   const { user, setUser } = useAuth();
-  const navigate = useNavigate();
+  const hasCar = user.role !== "rider";
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null); // slot whose request modal is open
@@ -121,6 +134,47 @@ export default function RiderDashboard() {
   const [riderCoord, setRiderCoord] = useState(null);
   const [driverCoords, setDriverCoords] = useState(new Map());
   const [enablingDriving, setEnablingDriving] = useState(false);
+
+  // Driver-side state — only meaningful (and only fetched) once the
+  // account has a car. Same page for everyone; this is just the part
+  // that's conditional on that.
+  const [driverRequests, setDriverRequests] = useState([]);
+  const [driverSlots, setDriverSlots] = useState([]);
+  const [driverLoading, setDriverLoading] = useState(true);
+  const [editRequest, setEditRequest] = useState(null);
+  const [showAddAvailability, setShowAddAvailability] = useState(false);
+
+  const loadDriverData = async () => {
+    setDriverLoading(true);
+    try {
+      const [{ data: allRides }, { data: mySlots }] = await Promise.all([
+        client.get("/rides/my"),
+        client.get("/availability", { params: { driver_id: user.id } }),
+      ]);
+      setDriverRequests(allRides.filter((r) => r.driver_id === user.id));
+      setDriverSlots(mySlots);
+    } finally {
+      setDriverLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (hasCar) loadDriverData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasCar]);
+
+  const pendingDriverRequests = [...driverRequests.filter((r) => r.status === "pending")].sort(
+    (a, b) => requestSortKey(a) - requestSortKey(b)
+  );
+  const otherDriverRequests = driverRequests.filter((r) => r.status !== "pending");
+  const nextRide = [...driverRequests.filter((r) => r.status === "confirmed")].sort(
+    (a, b) => requestSortKey(a) - requestSortKey(b)
+  )[0];
+
+  const actOnRequest = async (id, status) => {
+    await client.patch(`/rides/request/${id}`, { status });
+    loadDriverData();
+  };
 
   // Which way are you headed? Derived straight from the From/To text —
   // orients the map's home/destination pins and narrows the list below to
@@ -201,10 +255,9 @@ export default function RiderDashboard() {
 
   // Riders who don't have a car on file yet get flipped to role "both"
   // on the fly — having a car isn't a permanent choice, so there's no
-  // reason to make someone register separately to post a route. Once
-  // that's settled, this hands off to the driver interface — a full
-  // page, not a modal, since there's real content to manage there
-  // (incoming requests, posted routes), not just a quick form.
+  // reason to make someone register separately to post a route. Either
+  // way this just reveals the posting form in place — it stays hidden
+  // until asked for, rather than always taking up space on the page.
   const handleAddAvailabilityClick = async () => {
     if (user.role === "rider") {
       setEnablingDriving(true);
@@ -212,13 +265,13 @@ export default function RiderDashboard() {
         const { data } = await client.post("/auth/enable-driving", {});
         setUser(data);
       } catch {
-        // Non-fatal — /driver still works even if this failed; worst
-        // case posting a route there fails and they see that error.
+        // Non-fatal — the form below still lets them try; worst case
+        // posting a route fails and they see that error instead.
       } finally {
         setEnablingDriving(false);
       }
     }
-    navigate("/driver");
+    setShowAddAvailability((v) => !v);
   };
 
   // Geocode "my apartment" once, and every distinct driver address in the
@@ -364,10 +417,120 @@ export default function RiderDashboard() {
           <h1 style={{ fontSize: 30 }}>Rider dashboard</h1>
         </div>
         <button className="btn btn-primary btn-sm" onClick={handleAddAvailabilityClick} disabled={enablingDriving}>
-          {enablingDriving ? "One sec…" : "+ Add availability"}
+          {enablingDriving ? "One sec…" : showAddAvailability ? "✕ Close" : "+ Add availability"}
         </button>
       </div>
       <p className="muted" style={{ marginBottom: 16 }}>Browse driver routes and time slots headed your way.</p>
+
+      {hasCar && <RequestsSummaryCard pending={pendingDriverRequests} nextRide={nextRide} />}
+
+      {showAddAvailability && (
+        <AddAvailabilityForm user={user} onSaved={() => { setShowAddAvailability(false); loadDriverData(); }} />
+      )}
+
+      {hasCar && (
+        <>
+          <h2 id="incoming-requests" style={{ fontSize: 20, marginTop: 8, marginBottom: 14 }}>Incoming requests</h2>
+          {driverLoading ? (
+            <div className="spinner" />
+          ) : pendingDriverRequests.length === 0 ? (
+            <p className="muted">No pending requests right now.</p>
+          ) : (
+            <div className="stack">
+              {pendingDriverRequests.map((r) => (
+                <div key={r.id} className="card-flat row-between">
+                  <div>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                      {r.rider?.first_name} {r.rider?.last_name}
+                    </div>
+                    <div className="muted" style={{ fontSize: 13 }}>
+                      {r.custom_time
+                        ? new Date(r.custom_time).toLocaleString()
+                        : r.availability
+                        ? `${r.availability.start_time.slice(0, 5)}–${r.availability.end_time.slice(0, 5)}`
+                        : "Time TBD"}
+                      {" · "}
+                      {r.pickup_type === "pickup" ? "Pickup" : "Meet outside their place"}
+                      {r.custom_place ? ` at ${r.custom_place}` : r.availability ? ` near ${r.availability.route_from}` : ""}
+                    </div>
+                  </div>
+                  <div className="row" style={{ gap: 8 }}>
+                    <button className="btn btn-sm btn-ghost" onClick={() => setEditRequest(r)}>
+                      Request Edit
+                    </button>
+                    <button className="btn btn-sm btn-danger" onClick={() => actOnRequest(r.id, "declined")}>
+                      Decline
+                    </button>
+                    <button className="btn btn-sm btn-primary" onClick={() => actOnRequest(r.id, "confirmed")}>
+                      Accept
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {otherDriverRequests.length > 0 && (
+            <>
+              <h2 style={{ fontSize: 20, marginTop: 28, marginBottom: 14 }}>Other requests</h2>
+              <div className="stack">
+                {otherDriverRequests.map((r) => (
+                  <div key={r.id} className="card-flat row-between">
+                    <div>
+                      <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                        {r.rider?.first_name} {r.rider?.last_name}
+                      </div>
+                      <div className="muted" style={{ fontSize: 13 }}>
+                        {r.availability ? `${r.availability.route_from} → ${r.availability.route_to}` : r.custom_place}
+                      </div>
+                    </div>
+                    <div className="row" style={{ gap: 10 }}>
+                      <span className={`badge badge-${r.status}`}>{r.status}</span>
+                      {r.status === "confirmed" && (
+                        <>
+                          <Link to={`/chat/${r.id}`}>
+                            <button className="btn btn-sm btn-primary">Chat</button>
+                          </Link>
+                          <button className="btn btn-sm btn-ghost" onClick={() => actOnRequest(r.id, "completed")}>
+                            Mark completed
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          <h2 style={{ fontSize: 20, marginTop: 28, marginBottom: 14 }}>My availability</h2>
+          {driverSlots.length === 0 ? (
+            <p className="muted">You haven't posted any availability yet.</p>
+          ) : (
+            <div className="stack">
+              {driverSlots.map((s) => (
+                <div key={s.id} className="card-flat">
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>{s.route_from} → {s.route_to}</div>
+                  <div className="muted" style={{ fontSize: 13 }}>
+                    {s.date ? s.date : s.day_of_week != null ? `${DAYS_FULL[s.day_of_week]}s` : "One-off"} ·{" "}
+                    {s.start_time.slice(0, 5)}–{s.end_time.slice(0, 5)} · {s.seats_available} seat(s)
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {editRequest && (
+            <ComingSoonModal
+              title="Request Edit"
+              message="Suggesting a different time/place is available soon."
+              onClose={() => setEditRequest(null)}
+            />
+          )}
+        </>
+      )}
+
+      <h2 style={{ fontSize: 20, marginTop: hasCar ? 40 : 8, marginBottom: 14 }}>Find a ride</h2>
 
       <RouteSearchBar
         from={fromText}
@@ -530,6 +693,60 @@ function RideOptionRow({ slot, active, onClick }) {
         </div>
       </div>
     </button>
+  );
+}
+
+/** The first card for anyone with a car: how many requests are waiting
+ * on them, and what/who their next confirmed ride actually is — before
+ * the route-posting form and the full request list. */
+function RequestsSummaryCard({ pending, nextRide }) {
+  return (
+    <div className="card" style={{ marginBottom: 20 }}>
+      <div className="row-between" style={{ marginBottom: 14 }}>
+        <div>
+          <div className="muted" style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
+            Requests
+          </div>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>
+            {pending.length} pending {pending.length === 1 ? "request" : "requests"}
+          </div>
+        </div>
+        {pending.length > 0 && (
+          <a href="#incoming-requests" className="btn btn-primary btn-sm" style={{ textDecoration: "none" }}>
+            Review
+          </a>
+        )}
+      </div>
+
+      <div className="card-flat">
+        <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+          Next ride booked
+        </div>
+        {nextRide ? (
+          <>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>
+              {nextRide.rider?.first_name} {nextRide.rider?.last_name}
+            </div>
+            <div className="muted" style={{ fontSize: 13 }}>
+              {nextRide.custom_time
+                ? new Date(nextRide.custom_time).toLocaleString()
+                : nextRide.availability
+                ? `${DAYS_FULL[nextRide.availability.day_of_week]}s · ${nextRide.availability.start_time.slice(0, 5)}–${nextRide.availability.end_time.slice(0, 5)}`
+                : "Time TBD"}
+              {" · "}
+              {nextRide.pickup_type === "pickup" ? "Pickup" : "Meet outside their place"}
+              {nextRide.custom_place
+                ? ` at ${nextRide.custom_place}`
+                : nextRide.availability
+                ? ` near ${nextRide.availability.route_from}`
+                : ""}
+            </div>
+          </>
+        ) : (
+          <span className="muted" style={{ fontSize: 13 }}>No rides booked yet.</span>
+        )}
+      </div>
+    </div>
   );
 }
 

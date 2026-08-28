@@ -96,7 +96,7 @@ export default function ReviewPage() {
         <div className="card" style={{ maxWidth: 420, margin: "0 auto" }}>
           <div style={{ fontSize: 40, marginBottom: 10 }}>🌟</div>
           <h3 style={{ marginBottom: 8 }}>Thanks for the feedback!</h3>
-          <button className="btn btn-primary btn-block" style={{ marginTop: 10 }} onClick={() => navigate(user.role === "driver" ? "/driver" : "/rider")}>
+          <button className="btn btn-primary btn-block" style={{ marginTop: 10 }} onClick={() => navigate("/rider")}>
             Back to dashboard
           </button>
         </div>
@@ -154,7 +154,7 @@ export default function ReviewPage() {
         </button>
       </form>
 
-      <Link to={user.role === "driver" ? "/driver" : "/rider"}>
+      <Link to="/rider">
         <button className="btn btn-ghost" style={{ marginTop: 14 }}>Skip for now</button>
       </Link>
     </div>
