@@ -1,7 +1,10 @@
 import { Link } from "react-router-dom";
 import { CarIcon, DenyIcon, SteeringWheelIcon } from "../components/Icons";
+import { useAuth } from "../context/AuthContext";
 
 export default function Home() {
+  const { user, loading } = useAuth();
+
   return (
     <div>
       {/* Banner */}
@@ -24,9 +27,20 @@ export default function Home() {
             Commute Together, Share the Ride, Split the Cost.
           </p>
           <div className="row" style={{ justifyContent: "center", marginTop: 32 }}>
-            <Link to="/auth">
-              <button className="btn btn-primary">Log In / Register</button>
-            </Link>
+            {user ? (
+              <Link to="/rider">
+                <button className="btn btn-primary">Go to the app</button>
+              </Link>
+            ) : loading ? (
+              // Token's still being verified (e.g. backend cold start) —
+              // hold off rather than flash "Log In / Register" at someone
+              // who's actually already logged in.
+              <div style={{ height: 44 }} />
+            ) : (
+              <Link to="/auth">
+                <button className="btn btn-primary">Log In / Register</button>
+              </Link>
+            )}
           </div>
         </div>
       </section>
