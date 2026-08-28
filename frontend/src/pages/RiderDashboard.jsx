@@ -28,31 +28,27 @@ function requestSortKey(r) {
   return new Date(r.created_at).getTime();
 }
 
-const DISTANCE_OPTIONS = [
-  { value: "", label: "Distance" },
-  { value: "1", label: "1 mi" },
-  { value: "3", label: "3 mi" },
-  { value: "5", label: "5 mi" },
-  { value: "10", label: "10 mi" },
-];
-const SEX_OPTIONS = ["Sex", "Female", "Male", "Non-binary"];
-const SEATS_OPTIONS = [
-  { value: "", label: "Seats" },
-  { value: "1", label: "1+ seat" },
-  { value: "2", label: "2+ seats" },
-  { value: "3", label: "3+ seats" },
-];
+/** Is this ride happening today? Custom-time rides compare calendar
+ * dates directly; recurring availability slots only carry a day of the
+ * week, so today's own weekday (converted from JS's Sun=0 to this app's
+ * Mon=0 encoding) is compared instead. */
+function isRideToday(ride) {
+  if (ride.custom_time) {
+    return new Date(ride.custom_time).toDateString() === new Date().toDateString();
+  }
+  if (ride.availability?.day_of_week != null) {
+    const jsDay = new Date().getDay(); // 0=Sun..6=Sat
+    const ourDay = (jsDay + 6) % 7; // 0=Mon..6=Sun
+    return ride.availability.day_of_week === ourDay;
+  }
+  return false;
+}
+
 const TIME_OPTIONS = [
   { value: "", label: "Time" },
   { value: "morning", label: "Morning" },
   { value: "afternoon", label: "Afternoon" },
   { value: "evening", label: "Evening" },
-];
-const SORT_OPTIONS = [
-  { value: "distance", label: "Distance from me" },
-  { value: "rating", label: "Driver rating" },
-  { value: "seats", label: "Seats available" },
-  { value: "newest", label: "Newest listed" },
 ];
 
 function timeBucket(startTime) {
@@ -85,9 +81,10 @@ function categoryAverages(reviews) {
   }).filter(Boolean);
 }
 
-/** Small round avatar: the driver/rider's uploaded photo, or the car icon as a fallback. */
-function PersonAvatar({ photoUrl, size = 40 }) {
-  const [failed, setFailed] = useState(false);
+/** Small round avatar. Always shows the car icon — uploaded photos aren't
+ * displayed here (the profile_photo_url field and its upload still work
+ * fine elsewhere, this just doesn't render it in ride listings). */
+function PersonAvatar({ size = 40 }) {
   return (
     <div
       style={{
@@ -103,16 +100,7 @@ function PersonAvatar({ photoUrl, size = 40 }) {
         justifyContent: "center",
       }}
     >
-      {photoUrl && !failed ? (
-        <img
-          src={photoUrl}
-          alt=""
-          onError={() => setFailed(true)}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        />
-      ) : (
-        <CarIcon size={Math.round(size * 0.6)} />
-      )}
+      <CarIcon size={Math.round(size * 0.6)} />
     </div>
   );
 }
@@ -168,9 +156,7 @@ export default function RiderDashboard() {
     (a, b) => requestSortKey(a) - requestSortKey(b)
   );
   const otherDriverRequests = driverRequests.filter((r) => r.status !== "pending");
-  const nextRide = [...driverRequests.filter((r) => r.status === "confirmed")].sort(
-    (a, b) => requestSortKey(a) - requestSortKey(b)
-  )[0];
+  const acceptedDriverCount = driverRequests.filter((r) => r.status === "confirmed").length;
 
   const actOnRequest = async (id, status) => {
     await client.patch(`/rides/request/${id}`, { status });
@@ -183,14 +169,9 @@ export default function RiderDashboard() {
   // anything else into From/To already covers it.
   const direction = isCampusText(toText) ? "to_campus" : isCampusText(fromText) ? "to_home" : "custom";
 
-  // Filters — applied client-side over the fetched slots.
-  const [maxDistance, setMaxDistance] = useState("");
+  // Day/Time filters — set via the "Later" picker, applied client-side.
   const [dayFilter, setDayFilter] = useState("");
   const [timeFilter, setTimeFilter] = useState("");
-  const [sexFilter, setSexFilter] = useState("");
-  const [minSeats, setMinSeats] = useState("");
-  const [paymentFilter, setPaymentFilter] = useState("");
-  const [sortBy, setSortBy] = useState("distance");
   const RESULTS_PAGE_SIZE = 5;
   const [visibleCount, setVisibleCount] = useState(RESULTS_PAGE_SIZE);
 
@@ -282,6 +263,10 @@ export default function RiderDashboard() {
     () => myRides.find((r) => r.status === "confirmed" || r.status === "pending"),
     [myRides]
   );
+
+  // A confirmed ride (as a passenger) happening today gets its own card
+  // up top, before the requests/add-availability buttons.
+  const todaysRide = useMemo(() => myRides.find((r) => r.status === "confirmed" && isRideToday(r)), [myRides]);
 
   useEffect(() => {
     if (!activeRide) {
@@ -377,44 +362,96 @@ export default function RiderDashboard() {
 
     if (dayFilter !== "") list = list.filter((s) => String(s.day_of_week) === dayFilter);
     if (timeFilter) list = list.filter((s) => timeBucket(s.start_time) === timeFilter);
-    if (sexFilter) list = list.filter((s) => s.driver?.sex === sexFilter);
-    if (minSeats) list = list.filter((s) => s.seats_available >= Number(minSeats));
-    if (paymentFilter) list = list.filter((s) => s.driver?.driver_profile?.payment_methods?.includes(paymentFilter));
-    if (maxDistance) list = list.filter((s) => s._distance != null && s._distance <= Number(maxDistance));
 
-    list.sort((a, b) => {
-      if (sortBy === "distance") return (a._distance ?? Infinity) - (b._distance ?? Infinity);
-      if (sortBy === "rating") return (b.driver?.driver_profile?.avg_rating ?? 0) - (a.driver?.driver_profile?.avg_rating ?? 0);
-      if (sortBy === "seats") return b.seats_available - a.seats_available;
-      return b.id - a.id; // newest listed
-    });
+    list.sort((a, b) => (a._distance ?? Infinity) - (b._distance ?? Infinity));
     return list;
-  }, [slots, driverCoords, riderCoord, direction, fromText, toText, dayFilter, timeFilter, sexFilter, minSeats, paymentFilter, maxDistance, sortBy]);
+  }, [slots, driverCoords, riderCoord, direction, fromText, toText, dayFilter, timeFilter]);
 
   // Start back at the first page, and clear any selected ride, whenever
-  // the filters/direction/sort change the result set out from under it.
+  // the filters/direction change the result set out from under it.
   useEffect(() => {
     setVisibleCount(RESULTS_PAGE_SIZE);
     setSelectedSlotId(null);
-  }, [direction, fromText, toText, dayFilter, timeFilter, sexFilter, minSeats, paymentFilter, maxDistance, sortBy]);
+  }, [direction, fromText, toText, dayFilter, timeFilter]);
 
   return (
     <div className="container" style={{ paddingTop: 36 }}>
-      <div className="row" style={{ justifyContent: "flex-end", marginBottom: 16 }}>
-        <button className="btn btn-primary btn-sm" onClick={handleAddAvailabilityClick} disabled={enablingDriving}>
-          {enablingDriving ? "One sec…" : showAddAvailability ? "✕ Close" : "+ Add availability"}
-        </button>
-      </div>
+      {todaysRide && <TodaysRideCard ride={todaysRide} />}
 
-      {hasCar && <RequestsSummaryCard pending={pendingDriverRequests} nextRide={nextRide} />}
+      {hasCar && (
+        <RequestsButton pendingCount={pendingDriverRequests.length} acceptedCount={acceptedDriverCount} />
+      )}
+
+      <button
+        className="btn btn-primary btn-block"
+        onClick={handleAddAvailabilityClick}
+        disabled={enablingDriving}
+        style={{ marginBottom: 20 }}
+      >
+        {enablingDriving ? "One sec…" : showAddAvailability ? "✕ Close" : "+ Add availability"}
+      </button>
 
       {showAddAvailability && (
         <AddAvailabilityForm user={user} onSaved={() => { setShowAddAvailability(false); loadDriverData(); }} />
       )}
 
+      <h2 style={{ fontSize: 20, marginTop: 8, marginBottom: 14 }}>Find a ride</h2>
+
+      <RouteSearchBar
+        from={fromText}
+        to={toText}
+        onFromChange={setFromText}
+        onToChange={setToText}
+        homeValue={user.address || "Home"}
+        onFilled={handleFieldFilled}
+        onLater={() => setShowLaterModal(true)}
+        onSubmit={handleSearch}
+        submitLabel="Search"
+      />
+
+      <CampusMap {...mapProps} variant="compact" onExpandRequest={() => setMapExpanded(true)} />
+      <MapLegend />
+
+      <h2 style={{ fontSize: 20, marginTop: 28, marginBottom: 14 }}>Choose a ride</h2>
+
+      {loading ? (
+        <div className="spinner" />
+      ) : visibleSlots.length === 0 ? (
+        <p className="muted">No driver routes match yet — try clearing some filters.</p>
+      ) : (
+        <div className="stack">
+          {visibleSlots.slice(0, visibleCount).map((slot) => (
+            <RideOptionRow
+              key={slot.id}
+              slot={slot}
+              active={selectedSlotId === slot.id}
+              onClick={() => setSelectedSlotId(slot.id)}
+            />
+          ))}
+          {visibleCount < visibleSlots.length && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-block"
+              onClick={() => setVisibleCount((c) => c + RESULTS_PAGE_SIZE)}
+            >
+              Load more ({visibleSlots.length - visibleCount} more)
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn-primary btn-block"
+            disabled={!selectedSlotId}
+            onClick={() => setSelected(visibleSlots.find((s) => s.id === selectedSlotId))}
+            style={{ marginTop: 4 }}
+          >
+            {selectedSlotId ? "Request ride" : "Select a ride"}
+          </button>
+        </div>
+      )}
+
       {hasCar && (
         <>
-          <h2 id="incoming-requests" style={{ fontSize: 20, marginTop: 8, marginBottom: 14 }}>Incoming requests</h2>
+          <h2 id="incoming-requests" style={{ fontSize: 20, marginTop: 40, marginBottom: 14 }}>Incoming requests</h2>
           {driverLoading ? (
             <div className="spinner" />
           ) : pendingDriverRequests.length === 0 ? (
@@ -514,88 +551,7 @@ export default function RiderDashboard() {
         </>
       )}
 
-      <h2 style={{ fontSize: 20, marginTop: hasCar ? 40 : 8, marginBottom: 14 }}>Find a ride</h2>
-
-      <RouteSearchBar
-        from={fromText}
-        to={toText}
-        onFromChange={setFromText}
-        onToChange={setToText}
-        homeValue={user.address || "Home"}
-        onFilled={handleFieldFilled}
-        onLater={() => setShowLaterModal(true)}
-        onSubmit={handleSearch}
-        submitLabel="Search"
-      />
-
-      <CampusMap {...mapProps} variant="compact" onExpandRequest={() => setMapExpanded(true)} />
-      <MapLegend />
-
-      <h2 style={{ fontSize: 20, marginTop: 28, marginBottom: 14 }}>Choose a ride</h2>
-
-      <div id="ride-filters" className="card-flat" style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", flexWrap: "nowrap", gap: 6 }}>
-          <FilterSelect label="Distance" value={maxDistance} onChange={setMaxDistance} options={DISTANCE_OPTIONS} />
-          <FilterSelect
-            label="Day"
-            value={dayFilter}
-            onChange={setDayFilter}
-            options={[{ value: "", label: "Day" }, ...DAYS.map((d, i) => ({ value: String(i), label: d }))]}
-          />
-          <FilterSelect label="Time" value={timeFilter} onChange={setTimeFilter} options={TIME_OPTIONS} />
-          <FilterSelect
-            label="Sex"
-            value={sexFilter}
-            onChange={setSexFilter}
-            options={SEX_OPTIONS.map((s) => (s === "Sex" ? { value: "", label: s } : { value: s, label: s }))}
-          />
-          <FilterSelect label="Seats" value={minSeats} onChange={setMinSeats} options={SEATS_OPTIONS} />
-          <FilterSelect
-            label="Payment"
-            value={paymentFilter}
-            onChange={setPaymentFilter}
-            options={[{ value: "", label: "Payment" }, ...Object.entries(PAYMENT_LABELS).map(([value, label]) => ({ value, label }))]}
-          />
-          <FilterSelect label="Sort by" value={sortBy} onChange={setSortBy} options={SORT_OPTIONS} />
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="spinner" />
-      ) : visibleSlots.length === 0 ? (
-        <p className="muted">No driver routes match yet — try clearing some filters.</p>
-      ) : (
-        <div className="stack">
-          {visibleSlots.slice(0, visibleCount).map((slot) => (
-            <RideOptionRow
-              key={slot.id}
-              slot={slot}
-              active={selectedSlotId === slot.id}
-              onClick={() => setSelectedSlotId(slot.id)}
-            />
-          ))}
-          {visibleCount < visibleSlots.length && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-block"
-              onClick={() => setVisibleCount((c) => c + RESULTS_PAGE_SIZE)}
-            >
-              Load more ({visibleSlots.length - visibleCount} more)
-            </button>
-          )}
-          <button
-            type="button"
-            className="btn btn-primary btn-block"
-            disabled={!selectedSlotId}
-            onClick={() => setSelected(visibleSlots.find((s) => s.id === selectedSlotId))}
-            style={{ marginTop: 4 }}
-          >
-            {selectedSlotId ? "Request ride" : "Select a ride"}
-          </button>
-        </div>
-      )}
-
-      <h2 style={{ fontSize: 22, marginTop: 48, marginBottom: 16 }}>My requests</h2>
+      <h2 style={{ fontSize: 22, marginTop: 48, marginBottom: 16 }}>My last rides</h2>
       {myRides.length === 0 ? (
         <p className="muted">You haven't requested any rides yet.</p>
       ) : (
@@ -690,7 +646,7 @@ function RideOptionRow({ slot, active, onClick }) {
       }}
     >
       <div className="row" style={{ gap: 12, alignItems: "flex-start", minWidth: 0 }}>
-        <PersonAvatar photoUrl={slot.driver?.profile_photo_url} />
+        <PersonAvatar />
         <div style={{ minWidth: 0 }}>
           <div className="row" style={{ gap: 8 }}>
             <span
@@ -727,78 +683,90 @@ function RideOptionRow({ slot, active, onClick }) {
   );
 }
 
-/** The first card for anyone with a car: how many requests are waiting
- * on them, and what/who their next confirmed ride actually is — before
- * the route-posting form and the full request list. */
-function RequestsSummaryCard({ pending, nextRide }) {
+/** Full-width button, same shape as "+ Add availability" right below
+ * it — jumps to the incoming-requests list, with pending/accepted counts
+ * as colored tags so the numbers are visible without opening it. */
+function RequestsButton({ pendingCount, acceptedCount }) {
   return (
-    <div className="card" style={{ marginBottom: 20 }}>
-      <div className="row-between" style={{ marginBottom: 14 }}>
+    <a
+      href="#incoming-requests"
+      className="btn btn-primary btn-block"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        textDecoration: "none",
+        marginBottom: 10,
+      }}
+    >
+      <span>Requests</span>
+      <span className="row" style={{ gap: 8 }}>
+        <CountTag count={pendingCount} label="pending" bg="var(--warning)" color="#1a1206" />
+        {/* Green here (and only here, plus the map's match dot) is a
+            deliberate, narrow exception to "no green anywhere" — it's the
+            one place a plain accept/reject color pairing is clearer than
+            the app's usual blue. */}
+        <CountTag count={acceptedCount} label="accepted" bg="#3FA66A" color="#08150d" />
+      </span>
+    </a>
+  );
+}
+
+function CountTag({ count, label, bg, color }) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        background: bg,
+        color,
+        borderRadius: 999,
+        padding: "3px 10px",
+        fontSize: 12,
+        fontWeight: 800,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {count} {label}
+    </span>
+  );
+}
+
+/** Dedicated card for a confirmed ride happening today (as a passenger)
+ * — shown before the requests/add-availability buttons so it's the
+ * first thing noticed, with just the basics: who, when, and how to
+ * reach them. */
+function TodaysRideCard({ ride }) {
+  return (
+    <div className="card" style={{ marginBottom: 16, border: "1px solid var(--primary)" }}>
+      <div className="muted" style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+        Today's ride
+      </div>
+      <div className="row-between" style={{ alignItems: "flex-start" }}>
         <div>
-          <div className="muted" style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
-            Requests
+          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>
+            {ride.driver?.first_name} {ride.driver?.last_name}
           </div>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>
-            {pending.length} pending {pending.length === 1 ? "request" : "requests"}
+          <div className="muted" style={{ fontSize: 13 }}>
+            {ride.custom_time
+              ? new Date(ride.custom_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+              : ride.availability
+              ? `${ride.availability.start_time.slice(0, 5)}–${ride.availability.end_time.slice(0, 5)}`
+              : "Time TBD"}
+            {" · "}
+            {ride.pickup_type === "pickup" ? "Pickup" : "Meet outside their place"}
+            {ride.custom_place ? ` at ${ride.custom_place}` : ""}
           </div>
         </div>
-        {pending.length > 0 && (
-          <a href="#incoming-requests" className="btn btn-primary btn-sm" style={{ textDecoration: "none" }}>
-            Review
-          </a>
-        )}
-      </div>
-
-      <div className="card-flat">
-        <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
-          Next ride booked
-        </div>
-        {nextRide ? (
-          <>
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>
-              {nextRide.rider?.first_name} {nextRide.rider?.last_name}
-            </div>
-            <div className="muted" style={{ fontSize: 13 }}>
-              {nextRide.custom_time
-                ? new Date(nextRide.custom_time).toLocaleString()
-                : nextRide.availability
-                ? `${DAYS_FULL[nextRide.availability.day_of_week]}s · ${nextRide.availability.start_time.slice(0, 5)}–${nextRide.availability.end_time.slice(0, 5)}`
-                : "Time TBD"}
-              {" · "}
-              {nextRide.pickup_type === "pickup" ? "Pickup" : "Meet outside their place"}
-              {nextRide.custom_place
-                ? ` at ${nextRide.custom_place}`
-                : nextRide.availability
-                ? ` near ${nextRide.availability.route_from}`
-                : ""}
-            </div>
-          </>
-        ) : (
-          <span className="muted" style={{ fontSize: 13 }}>No rides booked yet.</span>
-        )}
+        <Link to={`/chat/${ride.id}`}>
+          <button className="btn btn-sm btn-primary">Chat</button>
+        </Link>
       </div>
     </div>
   );
 }
 
-function FilterSelect({ label, value, onChange, options }) {
-  return (
-    <div style={{ flex: "1 1 0", minWidth: 0 }}>
-      <label style={{ fontSize: 10, marginBottom: 3 }}>{label}</label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        style={{ width: "100%", fontSize: 12, padding: "9px 8px" }}
-      >
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
 
 function MyRideRow({ ride }) {
   const badgeClass = `badge badge-${ride.status}`;
@@ -890,7 +858,7 @@ function RouteDetailModal({ slot, onClose, onRequested }) {
         ) : (
           <>
             <div className="row" style={{ gap: 12, marginBottom: 2 }}>
-              <PersonAvatar photoUrl={driver.profile_photo_url} size={48} />
+              <PersonAvatar size={48} />
               <h3>{driver.first_name} {driver.last_name}</h3>
             </div>
             <div className="row" style={{ gap: 8, marginBottom: 10 }}>
