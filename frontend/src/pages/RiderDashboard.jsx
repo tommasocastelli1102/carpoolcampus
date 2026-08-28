@@ -233,6 +233,13 @@ export default function RiderDashboard() {
     loadSlots({ from: CAMPUS_SEARCH_TEXT, to: "" });
   };
 
+  // "Later" — rides aren't a live now/not-now feed, just recurring day +
+  // time slots, so browsing for later means the Day/Time filters below.
+  // Jump there instead of duplicating that picker inline.
+  const handleLaterClick = () => {
+    document.getElementById("ride-filters")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
   // Riders who don't have a car on file yet get flipped to role "both"
   // on the fly — having a car isn't a permanent choice, so there's no
   // reason to make someone register separately to post a route. Once
@@ -437,6 +444,7 @@ export default function RiderDashboard() {
         onToChange={setToText}
         onCampus={handleCampusClick}
         onHome={handleHomeClick}
+        onLater={handleLaterClick}
         onSubmit={handleSearch}
         submitLabel="Search"
       />
@@ -446,7 +454,7 @@ export default function RiderDashboard() {
       <CampusMap {...mapProps} variant="compact" onExpandRequest={() => setMapExpanded(true)} />
       <MapLegend />
 
-      <div className="card-flat" style={{ marginTop: 28, marginBottom: 24 }}>
+      <div id="ride-filters" className="card-flat" style={{ marginTop: 28, marginBottom: 24 }}>
         <div style={{ display: "flex", flexWrap: "nowrap", gap: 6 }}>
           <FilterSelect label="Distance" value={maxDistance} onChange={setMaxDistance} options={DISTANCE_OPTIONS} />
           <FilterSelect

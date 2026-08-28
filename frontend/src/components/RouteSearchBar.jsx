@@ -1,10 +1,11 @@
 import { isCampusText, CAMPUS_SEARCH_TEXT } from "../lib/campus";
 
-/** The one shared "Uber-style" interaction surface for both dashboards:
- * a From/To field pair plus two one-tap shortcuts for the two routes
- * everyone actually takes — to campus, or back home — so there's no need
- * for a separate "other destination" input. Typing anything else directly
- * into From/To already covers every other case.
+/** The one shared "Uber-style" interaction surface for both dashboards: a
+ * From/To field pair styled like a maps directions picker (hollow origin
+ * dot, dotted connector, destination pin), plus one-tap shortcuts below
+ * it for the two routes everyone actually takes — home and campus — so
+ * there's no need for a separate "other destination" input. Typing
+ * anything else directly into From/To already covers every other case.
  *
  * Riders search existing routes with this; drivers use the identical bar
  * to describe the route they're offering. `submitLabel` and the
@@ -17,43 +18,144 @@ export default function RouteSearchBar({
   onToChange,
   onCampus,
   onHome,
+  onLater,
   onSubmit,
   submitLabel = "Search",
-  fromPlaceholder = "From…",
-  toPlaceholder = "To…",
+  fromPlaceholder = "Choose starting point…",
+  toPlaceholder = "Where to?",
   children, // optional extra fields (e.g. driver's day/time/seats row)
 }) {
   const campusActive = isCampusText(to);
   const homeActive = isCampusText(from);
 
   return (
-    <div className="card-flat" style={{ marginBottom: 20 }}>
-      <form onSubmit={onSubmit} className="row" style={{ gap: 10, flexWrap: "wrap" }}>
-        <input
-          placeholder={fromPlaceholder}
-          value={from}
-          onChange={(e) => onFromChange(e.target.value)}
-          style={{ flex: "1 1 140px", minWidth: 0 }}
-        />
-        <input
-          placeholder={toPlaceholder}
-          value={to}
-          onChange={(e) => onToChange(e.target.value)}
-          style={{ flex: "1 1 140px", minWidth: 0 }}
-        />
-        <div className="row" style={{ gap: 6, flexShrink: 0 }}>
-          <ShortcutButton active={campusActive} onClick={onCampus}>
-            🎓 Campus
-          </ShortcutButton>
+    <div style={{ marginBottom: 20 }}>
+      <form onSubmit={onSubmit}>
+        <div className="route-fields">
+          <div className="route-fields-connector" aria-hidden>
+            <span className="route-dot" />
+            <span className="route-dotted-line" />
+            <span className="route-pin">📍</span>
+          </div>
+
+          <div className="route-field-row">
+            <input
+              placeholder={fromPlaceholder}
+              value={from}
+              onChange={(e) => onFromChange(e.target.value)}
+              className="route-input"
+            />
+            <button type="submit" className="route-search-btn" aria-label={submitLabel}>
+              🔍
+            </button>
+          </div>
+          <div className="route-field-divider" />
+          <div className="route-field-row">
+            <input
+              placeholder={toPlaceholder}
+              value={to}
+              onChange={(e) => onToChange(e.target.value)}
+              className="route-input"
+            />
+          </div>
+        </div>
+
+        <div className="row" style={{ gap: 8, marginTop: 12, flexWrap: "wrap" }}>
           <ShortcutButton active={homeActive} onClick={onHome}>
             🏠 Home
           </ShortcutButton>
+          <ShortcutButton active={campusActive} onClick={onCampus}>
+            🎓 Campus
+          </ShortcutButton>
+          {onLater && (
+            <ShortcutButton onClick={onLater}>
+              📅 Later
+            </ShortcutButton>
+          )}
+          <button className="btn btn-primary btn-sm" style={{ flexShrink: 0, marginLeft: "auto" }}>
+            {submitLabel}
+          </button>
         </div>
-        <button className="btn btn-primary" style={{ flexShrink: 0 }}>
-          {submitLabel}
-        </button>
         {children}
       </form>
+
+      <style>{`
+        .route-fields {
+          position: relative;
+          border: 1.5px solid var(--border);
+          border-radius: 16px;
+          background: var(--surface-raised);
+          transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .route-fields:focus-within {
+          border-color: var(--primary);
+          box-shadow: 0 0 0 3px rgba(45, 108, 246, 0.18);
+        }
+        .route-field-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 14px 12px 40px;
+        }
+        .route-field-divider {
+          height: 1px;
+          background: var(--border);
+          margin: 0 14px;
+        }
+        .route-input {
+          flex: 1;
+          min-width: 0;
+          border: none !important;
+          background: transparent !important;
+          padding: 0 !important;
+          box-shadow: none !important;
+        }
+        .route-input:focus {
+          border: none !important;
+          box-shadow: none !important;
+        }
+        .route-search-btn {
+          flex-shrink: 0;
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          font-size: 15px;
+          color: var(--text-muted);
+          padding: 4px;
+          display: flex;
+        }
+        .route-fields-connector {
+          position: absolute;
+          left: 14px;
+          top: 0;
+          bottom: 0;
+          width: 20px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          pointer-events: none;
+        }
+        .route-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          border: 2px solid var(--primary);
+          background: var(--surface-raised);
+          margin-top: 24px;
+          flex-shrink: 0;
+        }
+        .route-dotted-line {
+          flex: 1;
+          width: 0;
+          border-left: 1.5px dotted var(--border);
+          margin: 4px 0;
+        }
+        .route-pin {
+          font-size: 16px;
+          margin-bottom: 20px;
+          flex-shrink: 0;
+        }
+      `}</style>
     </div>
   );
 }
