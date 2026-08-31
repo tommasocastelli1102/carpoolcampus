@@ -237,15 +237,19 @@ export default function RiderDashboard() {
   const RESULTS_PAGE_SIZE = 5;
   const [visibleCount, setVisibleCount] = useState(RESULTS_PAGE_SIZE);
 
-  const loadSlots = async (overrides = {}) => {
+  // Always fetches the full, unfiltered slot list — narrowing by
+  // direction/text/day-time/radius all happens client-side in
+  // `visibleSlots` below. Deliberately does NOT pass fromText/toText to
+  // the backend: /rides/search filters by a literal substring match on
+  // each slot's route_from/route_to (short strings like "UCLA"), so
+  // sending it a real typed address ("405 Hilgard Ave, Los Angeles, CA
+  // 90095") would match nothing even though that address IS campus and
+  // plenty of routes go there — the client-side pipeline already knows
+  // that via isCampusText and geocoded distance.
+  const loadSlots = async () => {
     setLoading(true);
     try {
-      const from = overrides.from ?? fromText;
-      const to = overrides.to ?? toText;
-      const params = {};
-      if (from) params.route_from = from;
-      if (to) params.route_to = to;
-      const { data } = await client.get("/rides/search", { params });
+      const { data } = await client.get("/rides/search");
       setSlots(data);
     } finally {
       setLoading(false);
@@ -263,27 +267,25 @@ export default function RiderDashboard() {
   };
 
   useEffect(() => {
-    // Load the full list on first render regardless of the "UCLA" default
-    // shown in the To field — direction-based filtering (below) already
-    // narrows what's visible without also narrowing what the map knows
-    // about (e.g. which drivers currently have an open seat at all).
-    loadSlots({ from: "", to: "" });
+    loadSlots();
     loadMyRides();
     loadDrivers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The From/To text and the "Search" button don't need to touch the
+  // backend at all — visibleSlots below already recomputes live from
+  // fromText/toText as you type. This just gives a fresh pull of
+  // whatever's been posted since the initial load.
   const handleSearch = (e) => {
     e.preventDefault();
     loadSlots();
   };
 
   // Home/Campus fill whichever field was last focused (From or To) —
-  // RouteSearchBar already updated that field's text; this just re-runs
-  // the search with the new From/To together.
-  const handleFieldFilled = (field, value, merged) => {
-    loadSlots(merged);
-  };
+  // RouteSearchBar already updated that field's text, which is all
+  // visibleSlots needs to re-filter; nothing else to do here.
+  const handleFieldFilled = () => {};
 
   // Only shown to accounts that already have a car (see render below) —
   // becoming a driver at all happens from the profile menu, not here.
