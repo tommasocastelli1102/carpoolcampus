@@ -35,7 +35,7 @@ export default function RouteSearchBar({
   onToChange,
   homeValue = "Home",
   campusValue = CAMPUS_SEARCH_TEXT,
-  onFilled, // (field, value, {from, to}) => void — fires after Home/Campus fills a field
+  onFilled, // (field, value, {from, to}, coord?) => void — fires after Home/Campus or an autocomplete pick fills a field; `coord` ({lat,lng}) is only present for an autocomplete pick, straight from Google, so the caller can skip re-geocoding that exact text
   onLater,
   onSubmit,
   submitLabel = "Search",
@@ -123,27 +123,34 @@ export default function RouteSearchBar({
     clearTimeout(blurTimeoutRef.current);
     const prediction = suggestion.placePrediction;
     const text = prediction.text.toString();
-    // Resolve the full address immediately so what lands in the field
-    // matches what geocoding/search will see (the prediction's display
-    // text is sometimes abbreviated, e.g. missing the city).
+    // Resolve the full address (and its coordinates) immediately. The
+    // coordinates matter beyond just precision: the app's own geocoder
+    // (free/OpenStreetMap-backed, for distance math server-side) doesn't
+    // know every real place Google's autocomplete does — a landmark like
+    // "Rosenfeld Steps" resolves fine here but 404s there. Passing the
+    // coordinates Google already resolved up to the caller means callers
+    // that want them (RiderDashboard's search) never have to re-geocode
+    // this exact text through that weaker service at all.
     let address = text;
+    let coord = null;
     try {
       const place = prediction.toPlace();
-      await place.fetchFields({ fields: ["formattedAddress"] });
+      await place.fetchFields({ fields: ["formattedAddress", "location"] });
       if (place.formattedAddress) address = place.formattedAddress;
+      if (place.location) coord = { lat: place.location.lat(), lng: place.location.lng() };
     } catch {
-      // fall back to the prediction's own text
+      // fall back to the prediction's own text, no coordinates
     }
 
     sessionTokensRef.current[field] = null; // that session is spent
     if (field === "from") {
       setFromSuggestions([]);
       onFromChange(address);
-      onFilled?.("from", address, { from: address, to });
+      onFilled?.("from", address, { from: address, to }, coord);
     } else {
       setToSuggestions([]);
       onToChange(address);
-      onFilled?.("to", address, { from, to: address });
+      onFilled?.("to", address, { from, to: address }, coord);
     }
     setOpenDropdown(null);
   };

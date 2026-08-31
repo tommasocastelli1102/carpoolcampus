@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import client, { apiErrorMessage } from "../api/client";
 import { geocodeAddress, geocodeMany } from "../api/geocode";
@@ -19,6 +19,17 @@ import { getSearchRadius, onSearchRadiusChange } from "../lib/searchRadius";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DAYS_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+// isCampusText only catches a handful of hardcoded keywords ("UCLA",
+// "Hilgard", ...) — real campus destinations riders actually type or pick
+// from address autocomplete ("Rosenfeld Steps", "Ackerman Union", a
+// specific dorm) don't contain any of them and would otherwise register as
+// a random off-campus address. Once a typed address geocodes, anything
+// within this radius of campus counts as campus regardless of what the
+// text says — UCLA's ~1mi-wide campus comfortably fits inside it from a
+// central point without also swallowing genuinely distinct Westwood
+// addresses several blocks away.
+const NEAR_CAMPUS_MI = 0.75;
 
 function requestSortKey(r) {
   if (r.custom_time) return new Date(r.custom_time).getTime();
@@ -182,6 +193,8 @@ export default function RiderDashboard() {
   const [mapExpanded, setMapExpanded] = useState(false);
   const [riderCoord, setRiderCoord] = useState(null); // geocoded from the profile address, the fallback origin
   const [originCoord, setOriginCoord] = useState(null); // geocoded from the typed starting point, when there is one
+  const [destCoord, setDestCoord] = useState(null); // geocoded from the typed destination, when there is one
+  const [campusCoord, setCampusCoord] = useState(null); // geocoded once from the university's known address
   const [driverCoords, setDriverCoords] = useState(new Map());
   const [searchRadius, setSearchRadiusState] = useState(getSearchRadius());
 
@@ -225,11 +238,23 @@ export default function RiderDashboard() {
     loadDriverData();
   };
 
-  // Which way are you headed? Derived straight from the From/To text —
-  // orients the map's home/destination pins and narrows the list below to
-  // rides going that way. No separate "other destination" state: typing
+  const campusAddress = addressForUniversity(user.university);
+
+  // Which way are you headed? Derived from the From/To text AND, once it's
+  // geocoded, actual proximity to campus — isCampusText alone only catches
+  // a few hardcoded keywords, so a real typed/autocompleted campus address
+  // ("Rosenfeld Steps", a specific dorm) that doesn't happen to contain one
+  // would otherwise fall through to "custom" and match nothing. Orients
+  // the map's home/destination pins and narrows the list below to rides
+  // going that way. No separate "other destination" state: typing
   // anything else into From/To already covers it.
-  const direction = isCampusText(toText) ? "to_campus" : isCampusText(fromText) ? "to_home" : "custom";
+  const nearCampus = (coord) => !!coord && !!campusCoord && haversineMiles(coord, campusCoord) <= NEAR_CAMPUS_MI;
+  const direction =
+    isCampusText(toText) || nearCampus(destCoord)
+      ? "to_campus"
+      : isCampusText(fromText) || nearCampus(originCoord)
+      ? "to_home"
+      : "custom";
 
   // Day/Time filters — set via the "Later" picker, applied client-side.
   const [dayFilter, setDayFilter] = useState("");
@@ -282,10 +307,22 @@ export default function RiderDashboard() {
     loadSlots();
   };
 
-  // Home/Campus fill whichever field was last focused (From or To) —
-  // RouteSearchBar already updated that field's text, which is all
-  // visibleSlots needs to re-filter; nothing else to do here.
-  const handleFieldFilled = () => {};
+  // {from,to}: text this component already has real coordinates for from
+  // an autocomplete pick, straight from Google — set here, read by the
+  // geocoding effects below so they don't redundantly re-geocode the same
+  // text through the app's weaker free geocoder (which doesn't know every
+  // real place Google's autocomplete does, e.g. campus landmarks) and
+  // clobber a perfectly good coordinate with a failed lookup's null.
+  const autocompleteCoordRef = useRef({ from: null, to: null });
+
+  // Home/Campus fill whichever field was last focused (From or To);
+  // autocomplete picks call this too, with real coordinates attached.
+  const handleFieldFilled = (field, value, _merged, coord) => {
+    if (!coord) return;
+    autocompleteCoordRef.current[field] = { text: value, coord };
+    if (field === "from") setOriginCoord(coord);
+    else setDestCoord(coord);
+  };
 
   // Only shown to accounts that already have a car (see render below) —
   // becoming a driver at all happens from the profile menu, not here.
@@ -301,6 +338,12 @@ export default function RiderDashboard() {
     geocodeAddress(user.address).then(setRiderCoord);
   }, [user.address]);
 
+  // Once, so direction-detection can tell "is this typed address actually
+  // near campus" apart from just checking its text for a few keywords.
+  useEffect(() => {
+    geocodeAddress(campusAddress).then(setCampusCoord);
+  }, [campusAddress]);
+
   // Also geocode whatever's actually typed as the starting point, so
   // "Choose a ride" can search around that instead of always defaulting
   // to the home address — this is what the mile radius below is measured
@@ -311,6 +354,9 @@ export default function RiderDashboard() {
       setOriginCoord(null);
       return;
     }
+    // Already have a real coordinate for this exact text from an
+    // autocomplete pick (see handleFieldFilled) — don't re-geocode it.
+    if (autocompleteCoordRef.current.from?.text === from) return;
     let cancelled = false;
     geocodeAddress(from).then((coord) => {
       if (!cancelled) setOriginCoord(coord);
@@ -319,6 +365,24 @@ export default function RiderDashboard() {
       cancelled = true;
     };
   }, [fromText]);
+
+  // And the typed destination, purely for the same near-campus check —
+  // unlike originCoord this isn't used for radius filtering.
+  useEffect(() => {
+    const to = toText.trim();
+    if (!to) {
+      setDestCoord(null);
+      return;
+    }
+    if (autocompleteCoordRef.current.to?.text === to) return;
+    let cancelled = false;
+    geocodeAddress(to).then((coord) => {
+      if (!cancelled) setDestCoord(coord);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [toText]);
 
   // Pick up range changes made from the profile menu while this page is
   // already open.
@@ -461,7 +525,6 @@ export default function RiderDashboard() {
     }
   };
 
-  const campusAddress = addressForUniversity(user.university);
   // "custom" (free-typed text that isn't campus/home) falls back to the
   // campus orientation for the map — arbitrary route text isn't a safe
   // geocoding target, only real profile/campus addresses are.
