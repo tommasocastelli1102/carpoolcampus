@@ -7,7 +7,12 @@ import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LOADER_ID, GOOGLE_MAPS_LIBRARIES } fro
 // since every real use of this app is a campus commute there — an exact
 // street match anywhere else still works, this just ranks nearby ones
 // first the way typing into Google Maps itself would.
-const LA_BOUNDS = { north: 34.34, south: 33.7, east: -118.15, west: -118.67 };
+const LA_BOUNDS = {
+  west: -118.67, south: 33.7, east: -118.15, north: 34.34,
+};
+
+const SUGGEST_DEBOUNCE_MS = 220;
+const MIN_CHARS = 3;
 
 /** The one shared "Uber-style" interaction surface for both dashboards: a
  * From/To field pair styled like a maps directions picker (hollow origin
@@ -40,56 +45,34 @@ export default function RouteSearchBar({
   children, // optional extra fields (e.g. driver's day/time/seats row)
 }) {
   const [activeField, setActiveField] = useState("to");
-  const fromInputRef = useRef(null);
-  const toInputRef = useRef(null);
-  // Autocomplete fires its own 'place_changed' -> onFromChange/onToChange;
-  // these track the latest values so that handler (attached once, on load)
-  // always sees the current sibling field instead of a stale closure.
-  const fromRef = useRef(from);
-  const toRef = useRef(to);
-  fromRef.current = from;
-  toRef.current = to;
 
+  // Every useJsApiLoader call sharing this `id` (this one, the other
+  // RouteSearchBar instance, and CampusMap's) must pass identical options
+  // — the underlying loader is a singleton keyed by `id` and throws if two
+  // callers disagree, even if only one of them actually needs Places. So
+  // this always passes the real key/libraries regardless of whether
+  // *this* instance uses addressAutocomplete; the hook itself is cheap
+  // when the script is already loaded (which it always is once CampusMap
+  // has mounted on the same page).
   const { isLoaded: mapsLoaded } = useJsApiLoader({
     id: GOOGLE_MAPS_LOADER_ID,
-    googleMapsApiKey: (addressAutocomplete && GOOGLE_MAPS_API_KEY) || "",
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY || "",
     libraries: GOOGLE_MAPS_LIBRARIES,
   });
 
+  // The `places` sub-library's classes (AutocompleteSuggestion etc.) come
+  // through google.maps.importLibrary, not directly off google.maps.places,
+  // even once the bootstrap loader above has finished.
+  const [placesLib, setPlacesLib] = useState(null);
   useEffect(() => {
-    if (!addressAutocomplete || !mapsLoaded || !window.google?.maps?.places) return;
-
-    const options = {
-      fields: ["formatted_address"],
-      bounds: LA_BOUNDS,
-      componentRestrictions: { country: "us" },
-    };
-
-    const fromAutocomplete = new window.google.maps.places.Autocomplete(fromInputRef.current, options);
-    const fromListener = fromAutocomplete.addListener("place_changed", () => {
-      const place = fromAutocomplete.getPlace();
-      if (place?.formatted_address) {
-        onFromChange(place.formatted_address);
-        onFilled?.("from", place.formatted_address, { from: place.formatted_address, to: toRef.current });
-      }
+    if (!addressAutocomplete || !mapsLoaded) return;
+    let cancelled = false;
+    window.google.maps.importLibrary("places").then((lib) => {
+      if (!cancelled) setPlacesLib(lib);
     });
-
-    const toAutocomplete = new window.google.maps.places.Autocomplete(toInputRef.current, options);
-    const toListener = toAutocomplete.addListener("place_changed", () => {
-      const place = toAutocomplete.getPlace();
-      if (place?.formatted_address) {
-        onToChange(place.formatted_address);
-        onFilled?.("to", place.formatted_address, { from: fromRef.current, to: place.formatted_address });
-      }
-    });
-
     return () => {
-      fromListener.remove();
-      toListener.remove();
-      window.google.maps.event.clearInstanceListeners(fromAutocomplete);
-      window.google.maps.event.clearInstanceListeners(toAutocomplete);
+      cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addressAutocomplete, mapsLoaded]);
 
   const fillActiveField = (value) => {
@@ -102,6 +85,71 @@ export default function RouteSearchBar({
     }
   };
 
+  const [fromSuggestions, setFromSuggestions] = useState([]);
+  const [toSuggestions, setToSuggestions] = useState([]);
+  const [openDropdown, setOpenDropdown] = useState(null); // "from" | "to" | null
+  const debounceRef = useRef(null);
+  const sessionTokensRef = useRef({ from: null, to: null }); // one per field, reused across keystrokes until a pick or a clear
+  const blurTimeoutRef = useRef(null);
+
+  const fetchSuggestions = (field, text) => {
+    clearTimeout(debounceRef.current);
+    const setSuggestions = field === "from" ? setFromSuggestions : setToSuggestions;
+
+    if (!placesLib || text.trim().length < MIN_CHARS) {
+      setSuggestions([]);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      if (!sessionTokensRef.current[field]) {
+        sessionTokensRef.current[field] = new placesLib.AutocompleteSessionToken();
+      }
+      try {
+        const { suggestions } = await placesLib.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input: text,
+          sessionToken: sessionTokensRef.current[field],
+          locationBias: LA_BOUNDS,
+          includedRegionCodes: ["us"],
+        });
+        setSuggestions((suggestions || []).filter((s) => s.placePrediction).slice(0, 6));
+      } catch {
+        setSuggestions([]);
+      }
+    }, SUGGEST_DEBOUNCE_MS);
+  };
+
+  const pickSuggestion = async (field, suggestion) => {
+    clearTimeout(blurTimeoutRef.current);
+    const prediction = suggestion.placePrediction;
+    const text = prediction.text.toString();
+    // Resolve the full address immediately so what lands in the field
+    // matches what geocoding/search will see (the prediction's display
+    // text is sometimes abbreviated, e.g. missing the city).
+    let address = text;
+    try {
+      const place = prediction.toPlace();
+      await place.fetchFields({ fields: ["formattedAddress"] });
+      if (place.formattedAddress) address = place.formattedAddress;
+    } catch {
+      // fall back to the prediction's own text
+    }
+
+    sessionTokensRef.current[field] = null; // that session is spent
+    if (field === "from") {
+      setFromSuggestions([]);
+      onFromChange(address);
+      onFilled?.("from", address, { from: address, to });
+    } else {
+      setToSuggestions([]);
+      onToChange(address);
+      onFilled?.("to", address, { from, to: address });
+    }
+    setOpenDropdown(null);
+  };
+
+  const suggestionsFor = (field) => (field === "from" ? fromSuggestions : toSuggestions);
+
   return (
     <div style={{ marginBottom: 20 }}>
       <form onSubmit={onSubmit}>
@@ -112,29 +160,63 @@ export default function RouteSearchBar({
             <span className="route-pin">📍</span>
           </div>
 
-          <div className="route-field-row">
+          <div className="route-field-row" style={{ position: "relative" }}>
             <input
-              ref={fromInputRef}
               placeholder={fromPlaceholder}
               value={from}
-              onChange={(e) => onFromChange(e.target.value)}
-              onFocus={() => setActiveField("from")}
+              onChange={(e) => {
+                onFromChange(e.target.value);
+                if (addressAutocomplete) fetchSuggestions("from", e.target.value);
+              }}
+              onFocus={() => {
+                setActiveField("from");
+                if (addressAutocomplete) setOpenDropdown("from");
+              }}
+              onBlur={() => {
+                // Only close if "from" is still the open one by the time this
+                // fires — otherwise a stale timeout from this blur can land
+                // *after* the other field has already opened its own
+                // dropdown and incorrectly close that one instead.
+                blurTimeoutRef.current = setTimeout(
+                  () => setOpenDropdown((current) => (current === "from" ? null : current)),
+                  150
+                );
+              }}
               className="route-input"
+              autoComplete="off"
             />
             <button type="submit" className="route-search-btn" aria-label={submitLabel}>
               🔍
             </button>
+            {addressAutocomplete && openDropdown === "from" && fromSuggestions.length > 0 && (
+              <SuggestionDropdown suggestions={fromSuggestions} onPick={(s) => pickSuggestion("from", s)} />
+            )}
           </div>
           <div className="route-field-divider" />
-          <div className="route-field-row">
+          <div className="route-field-row" style={{ position: "relative" }}>
             <input
-              ref={toInputRef}
               placeholder={toPlaceholder}
               value={to}
-              onChange={(e) => onToChange(e.target.value)}
-              onFocus={() => setActiveField("to")}
+              onChange={(e) => {
+                onToChange(e.target.value);
+                if (addressAutocomplete) fetchSuggestions("to", e.target.value);
+              }}
+              onFocus={() => {
+                setActiveField("to");
+                if (addressAutocomplete) setOpenDropdown("to");
+              }}
+              onBlur={() => {
+                blurTimeoutRef.current = setTimeout(
+                  () => setOpenDropdown((current) => (current === "to" ? null : current)),
+                  150
+                );
+              }}
               className="route-input"
+              autoComplete="off"
             />
+            {addressAutocomplete && openDropdown === "to" && toSuggestions.length > 0 && (
+              <SuggestionDropdown suggestions={toSuggestions} onPick={(s) => pickSuggestion("to", s)} />
+            )}
           </div>
         </div>
 
@@ -229,41 +311,71 @@ export default function RouteSearchBar({
           margin-bottom: 20px;
           flex-shrink: 0;
         }
-        /* Google's address-suggestion dropdown (.pac-container) is appended
-           to <body>, outside this component's own tree, and defaults to a
-           light theme — restyle it to match the app instead of clashing. */
-        .pac-container {
+        .route-suggestions {
+          position: absolute;
+          left: -26px;
+          right: 0;
+          top: 100%;
+          z-index: 20;
+          margin-top: 6px;
           background: var(--surface-raised);
           border: 1px solid var(--border);
           border-radius: 12px;
-          margin-top: 6px;
           box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-          font-family: inherit;
+          overflow: hidden;
         }
-        .pac-item {
+        .route-suggestion-item {
+          display: block;
+          width: 100%;
+          text-align: left;
+          background: none;
+          border: none;
           border-top: 1px solid var(--border);
-          padding: 9px 12px;
-          color: var(--text-muted);
+          padding: 10px 12px;
           font-size: 13px;
+          color: var(--text-muted);
           cursor: pointer;
         }
-        .pac-item:first-child {
+        .route-suggestion-item:first-child {
           border-top: none;
         }
-        .pac-item:hover,
-        .pac-item-selected {
+        .route-suggestion-item:hover,
+        .route-suggestion-item:focus {
           background: var(--surface);
         }
-        .pac-item-query {
+        .route-suggestion-main {
           color: var(--text);
-        }
-        .pac-icon {
-          filter: invert(1) grayscale(1) brightness(1.6);
-        }
-        .pac-logo:after {
-          margin: 4px 8px 8px;
+          font-weight: 600;
         }
       `}</style>
+    </div>
+  );
+}
+
+function SuggestionDropdown({ suggestions, onPick }) {
+  return (
+    <div className="route-suggestions">
+      {suggestions.map((s, i) => {
+        const prediction = s.placePrediction;
+        const main = prediction.mainText?.toString() || prediction.text.toString();
+        const secondary = prediction.secondaryText?.toString();
+        return (
+          <button
+            type="button"
+            key={prediction.placeId || i}
+            className="route-suggestion-item"
+            // onMouseDown (not onClick) fires before the input's onBlur
+            // closes the dropdown, so the pick still lands.
+            onMouseDown={(e) => {
+              e.preventDefault();
+              onPick(s);
+            }}
+          >
+            <span className="route-suggestion-main">{main}</span>
+            {secondary ? <span> · {secondary}</span> : null}
+          </button>
+        );
+      })}
     </div>
   );
 }
