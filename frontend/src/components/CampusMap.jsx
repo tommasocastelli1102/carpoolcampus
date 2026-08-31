@@ -2,14 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { GoogleMap, OverlayView, Polyline, useJsApiLoader } from "@react-google-maps/api";
 import { geocodeMany } from "../api/geocode";
 import { estimateMinutes, haversineMiles, formatMiles } from "../lib/geo";
+import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LOADER_ID, GOOGLE_MAPS_LIBRARIES } from "../lib/googleMaps";
 
 const ROUTE_COLOR = "#2D6CF6"; // var(--primary)
 const DEST_COLOR = "#F6B62D";
 const MATCH_COLOR = "#3FA66A"; // muted green, used only for map match/no-match status — the one
 const NO_MATCH_COLOR = "#5B6479"; // deliberate exception to the app's no-green rule (see docs below)
-
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-const GOOGLE_MAPS_LIBRARIES = []; // stable reference — recreating this array on every render forces useJsApiLoader to reload the script
 
 // A dark map style approximating the app's own dark theme (--bg/--surface/
 // --border/--text-muted), since Google's default basemap is white.
@@ -146,7 +144,7 @@ export default function CampusMap({
   emptyHint,
 }) {
   const { isLoaded, loadError } = useJsApiLoader({
-    id: "carpoolcampus-google-maps",
+    id: GOOGLE_MAPS_LOADER_ID,
     googleMapsApiKey: GOOGLE_MAPS_API_KEY || "",
     libraries: GOOGLE_MAPS_LIBRARIES,
   });
