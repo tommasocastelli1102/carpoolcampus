@@ -42,6 +42,11 @@ export default function AuthPage() {
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Flips on if a submit is still pending after a few seconds — almost
+  // always the free-tier backend waking up from sleep, not something
+  // actually stuck, so this swaps in an explanation rather than leaving
+  // "Logging in…" sitting there with no context.
+  const [slow, setSlow] = useState(false);
   const [showBruinModal, setShowBruinModal] = useState(false);
   const [spots, setSpots] = useState([]); // driver "when free to drive" spots: {day_of_week, start_time, end_time}
 
@@ -78,12 +83,15 @@ export default function AuthPage() {
     e.preventDefault();
     setError("");
     setSubmitting(true);
+    const slowTimer = setTimeout(() => setSlow(true), 3500);
     try {
       const user = await login(loginForm.email, loginForm.password);
       goToDashboard(user);
     } catch (err) {
       setError(apiErrorMessage(err, "Couldn't log in. Check your email and password."));
     } finally {
+      clearTimeout(slowTimer);
+      setSlow(false);
       setSubmitting(false);
     }
   };
@@ -92,6 +100,7 @@ export default function AuthPage() {
     e.preventDefault();
     setError("");
     setSubmitting(true);
+    const slowTimer = setTimeout(() => setSlow(true), 3500);
     try {
       const payload = {
         first_name: form.first_name,
@@ -145,6 +154,8 @@ export default function AuthPage() {
     } catch (err) {
       setError(apiErrorMessage(err, "Couldn't create your account."));
     } finally {
+      clearTimeout(slowTimer);
+      setSlow(false);
       setSubmitting(false);
     }
   };
@@ -217,6 +228,11 @@ export default function AuthPage() {
             <button className="btn btn-primary btn-block" disabled={submitting}>
               {submitting ? "Logging in…" : "Log In"}
             </button>
+            {submitting && slow && (
+              <p className="helper-text" style={{ textAlign: "center", marginTop: 10 }}>
+                Still working — the server naps when idle and can take up to a minute to wake back up.
+              </p>
+            )}
           </form>
         ) : (
           <form onSubmit={handleRegister}>
@@ -356,6 +372,11 @@ export default function AuthPage() {
             <button className="btn btn-primary btn-block" disabled={submitting} style={{ marginTop: 4 }}>
               {submitting ? "Creating account…" : "Create Account"}
             </button>
+            {submitting && slow && (
+              <p className="helper-text" style={{ textAlign: "center", marginTop: 10 }}>
+                Still working — the server naps when idle and can take up to a minute to wake back up.
+              </p>
+            )}
           </form>
         )}
 

@@ -14,6 +14,11 @@ export function AuthProvider({ children }) {
   const loadMe = useCallback(async () => {
     const token = localStorage.getItem("cc_token");
     if (!token) {
+      // No session to restore, but still worth waking the free-tier
+      // backend up now rather than leaving a logged-out visitor's first
+      // Log In click to eat the entire cold-start delay by itself.
+      // Fire-and-forget: a cheap, side-effect-free ping, errors ignored.
+      client.get("/health").catch(() => {});
       setLoading(false);
       return;
     }
