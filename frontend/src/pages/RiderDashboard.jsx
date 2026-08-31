@@ -522,6 +522,7 @@ export default function RiderDashboard() {
         onLater={() => setShowLaterModal(true)}
         onSubmit={handleSearch}
         submitLabel="Search"
+        addressAutocomplete
       />
 
       <CampusMap {...mapProps} variant="compact" onExpandRequest={() => setMapExpanded(true)} />
